@@ -54,10 +54,11 @@ import house_style
 # Rule 0, applied once: the theme is the first plotting line.
 house_style.apply_theme("detailed")
 
-# The semantic-colour default we will defend all course: grey carries context,
-# exactly one accent carries the point.
+# Grey-for-context + one accent is our DEFAULT for single-message charts — not a
+# mandate. Where several series genuinely need telling apart, reach for a fuller
+# (principled, non-rainbow) palette. The house accent is #6400FF.
 GREY = "#9e9e9e"
-ACCENT = "#d1495b"
+ACCENT = "#6400FF"
 ```
 
 # M0 — Environment & the mental model
@@ -225,14 +226,203 @@ for ax, scale in zip(axes, [1, 1000]):
    tied to the panel (titles, source notes, callouts that should not move with the data).
 :::
 
+# M1 — Chart choice: ask before you plot
+
+M0 gave you the tools to draw anything. M1 is the discipline of drawing the **right** thing. The most
+expensive mistake in a chart is made *before any code runs* — choosing a form that cannot answer the
+question. So the rule of this module is a sentence you say out loud first:
+
+> **"`<chart>` because `<shape>` + `<task>`."** — stated before you type `plt.subplots`.
+
+The full framework — the pre-flight checklist, a *(data shape × task) → chart* lookup, a chart catalog, and
+the anti-patterns — lives in [`VISUALIZATION_GUIDE.md`](../VISUALIZATION_GUIDE.md). Here we *earn* three of its
+hardest lessons by doing each the wrong way first, on the project's real datasets.
+
+::: {.callout-note}
+## The pre-flight checklist (the condensed version)
+1. **Message** — the one sentence the figure must land. (It becomes the title.)
+2. **Audience & medium** — slide/poster → `executive`; report → `detailed`.
+3. **Data shape** — how many variables, each one's *type* (quantitative / categorical / temporal / geographic),
+   how many rows & categories.
+4. **Task — the verb** — comparison · ranking · distribution · relationship · part-to-whole · evolution ·
+   deviation · flow · spatial.
+5. **→ Chart** — read *(shape × task)* off the table in `VISUALIZATION_GUIDE.md`, and say the sentence.
+:::
+
+```{python}
+#| label: m1-data
+from pathlib import Path
+import pandas as pd
+
+DATA = Path("../data")
+
+def load(name):
+    """Load a tidy dataset built by data/build_datasets.py.
+
+    The data is gitignored (regenerable), so a fresh clone has none yet. Fail with the
+    exact build command instead of a bare FileNotFoundError three frames deep.
+    """
+    path = DATA / f"{name}.csv"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} not found — the datasets are gitignored. Build them first:\n"
+            f"    uv run python data/build_datasets.py"
+        )
+    return pd.read_csv(path)
+
+gap = load("gapminder")
+dino = load("datasaurus")
+```
+
+## Lesson 1 — distrust the summary (why we plot at all)
+
+Before you can choose *how* to show data, you have to **look** at it — because the numbers you'd otherwise
+choose from can be identical for wildly different data. The Datasaurus Dozen is engineered to prove exactly
+that: thirteen datasets with the same mean and standard deviation (to two decimals) and a near-identical,
+near-zero correlation — yet wildly different shapes.
+
+```{python}
+#| label: m1-datasaurus
+#| fig-cap: "Four of the Datasaurus Dozen. Identical summary statistics; only the scatter is honest."
+picks = ["dino", "star", "bullseye", "x_shape"]
+
+# Compute the shared statistics from the data — never transcribe remembered constants.
+d0 = dino[dino.dataset == picks[0]]
+mx, my, sx, sy = d0.x.mean(), d0.y.mean(), d0.x.std(), d0.y.std()
+r = d0.x.corr(d0.y)
+
+fig, axes = plt.subplots(2, 2, figsize=(8, 7.6), sharex=True, sharey=True,
+                         constrained_layout=True)
+for ax, name in zip(axes.flat, picks):
+    sub = dino[dino.dataset == name]
+    ax.scatter(sub.x, sub.y, s=14, color=GREY, alpha=0.85, edgecolor="none")
+    ax.set_title(name, loc="left", fontsize=11, color=ACCENT)
+    ax.set_xticks([]); ax.set_yticks([])
+
+fig.suptitle("Identical statistics, four different pictures", x=0.012, ha="left",
+             fontsize=14, weight="medium")
+# mathtext keeps the symbols crisp and font-independent (League Spartan has no subscript glyphs).
+stats = (rf"every panel:   $\bar{{x}}={mx:.1f}$,   $\bar{{y}}={my:.1f}$,   "
+         rf"$s_x={sx:.1f}$,   $s_y={sy:.1f}$,   $r\approx{r:+.2f}$")
+caption = fig.text(0.012, -0.012,
+                   stats + "    —    the summary can't tell them apart; only the plot can.",
+                   fontsize=9, color="#5a5a5a")
+```
+
+If you'd picked a chart — or drawn a conclusion — from those five numbers, you'd have been wrong four
+different ways. **Plot first; the shape of the data decides the chart.**
+
+## Lesson 2 — two time points want a dumbbell, not grouped bars
+
+*Task:* the **change** across categories between two times. *Shape:* one categorical (country) + two
+quantitative (life expectancy in 1952 and 2007). Grouped bars encode the two *levels* faithfully — but the
+reader came for the *change*, and bars make them compute it by eye. A **dumbbell** encodes the change
+directly: it **is** the segment between the two dots.
+
+```{python}
+#| label: m1-dumbbell
+#| fig-cap: "Same numbers, two encodings. Grouped bars make you subtract; the dumbbell shows the change — and the exception."
+countries = ["China", "Indonesia", "Brazil", "India", "Botswana", "Ethiopia", "Zimbabwe"]
+pair = (gap[gap.country.isin(countries) & gap.year.isin([1952, 2007])]
+        .pivot(index="country", columns="year", values="lifeExp")
+        .sort_values(2007))
+y = np.arange(len(pair))
+rose = (pair[2007] >= pair[1952]).to_numpy()        # True except where it fell
+mark = np.where(rose, GREY, ACCENT)                 # one accent: the country that fell
+
+fig, (bad, good) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True)
+
+# WRONG — grouped bars: tall and honest, but "how much did it CHANGE?" is buried.
+h = 0.4
+bad.barh(y - h / 2, pair[1952], height=h, color="#cfcfcf", label="1952")
+bad.barh(y + h / 2, pair[2007], height=h, color=GREY, label="2007")
+bad.set_yticks(y); bad.set_yticklabels(pair.index)
+bad.set_xlabel("Life expectancy (years)")
+bad.set_title("Grouped bars — find the change", loc="left", fontsize=11)
+bad.legend(loc="lower right", frameon=False, fontsize=8)
+
+# RIGHT — dumbbell: the connecting segment IS the change; colour flags the one exception.
+good.hlines(y, pair[1952], pair[2007], color=mark, lw=2.4, zorder=1)
+good.scatter(pair[1952], y, color="#cfcfcf", s=44, zorder=2)
+good.scatter(pair[2007], y, color=mark, s=60, zorder=3)
+good.set_yticks(y); good.set_yticklabels(pair.index)
+good.set_xlabel("Life expectancy (years)")
+good.set_title("Dumbbell — and Zimbabwe is the one that fell", loc="left", fontsize=11)
+top = len(pair) - 1
+end_52 = good.annotate("1952", (pair[1952].iloc[top], top), textcoords="offset points",
+                       xytext=(0, 10), ha="center", fontsize=8, color="#8a8a8a")
+end_07 = good.annotate("2007", (pair[2007].iloc[top], top), textcoords="offset points",
+                       xytext=(0, 10), ha="center", fontsize=8, color=GREY)
+
+fig.suptitle("Life expectancy rose across the developing world from 1952 to 2007 — Zimbabwe is the exception",
+             x=0.012, ha="left", fontsize=13, weight="medium")
+source = fig.text(0.012, -0.02, "Data: Gapminder (1952 vs 2007).", fontsize=8, color="#8a8a8a")
+```
+
+Same numbers in both panels. The bars are honest but mute; the dumbbell says *"almost everyone rose — and
+here is the one who didn't"* before you've read a single label.
+
+## Lesson 3 — part-to-whole is a bar, not a pie
+
+*Task:* part-to-whole **and** ranking. A pie asks the reader to compare angles and chase a legend; past about
+five slices it fails at the very thing ranking needs. A **sorted bar** makes order and magnitude immediate —
+which is why the house rule is *no pie beyond ~5 slices* (`CLAUDE.md`).
+
+```{python}
+#| label: m1-partwhole
+#| fig-cap: "World population 2007 by country. The pie hides the ranking the sorted bar makes obvious."
+pop07 = gap[gap.year == 2007].groupby("country")["pop"].sum().sort_values(ascending=False)
+parts = pd.concat([pop07.head(8), pd.Series({"Other": pop07.iloc[8:].sum()})])
+share = (100 * parts / parts.sum()).sort_values()   # ascending → longest bar on top
+
+fig, (bad, good) = plt.subplots(1, 2, figsize=(11, 5), constrained_layout=True)
+
+# WRONG — pie: nine wedges, a legend, and you still can't rank them by eye.
+greys = plt.cm.Greys(np.linspace(0.2, 0.85, len(parts)))
+wedges, texts, autos = bad.pie(parts, labels=parts.index, autopct="%1.0f%%", colors=greys,
+                               startangle=90, textprops={"fontsize": 8})
+bad.set_title("Pie — now rank these", loc="left", fontsize=11)
+
+# RIGHT — sorted bar of shares: ranking and magnitude in one read; accent the two giants.
+yb = np.arange(len(share))
+mark = [ACCENT if c in ("China", "India") else GREY for c in share.index]
+good.barh(yb, share.to_numpy(), color=mark)
+good.set_yticks(yb); good.set_yticklabels(share.index)
+good.set_xlabel("Share of world population, 2007 (%)")
+good.set_title("Sorted bar — the order reads itself", loc="left", fontsize=11)
+good.margins(x=0.14)
+for yi, v in zip(yb, share.to_numpy()):
+    good.annotate(f"{v:.0f}%", (v, yi), xytext=(4, 0), textcoords="offset points",
+                  va="center", fontsize=8, color="#5a5a5a")
+
+fig.suptitle("China and India alone are more than a third of the world — obvious in a bar, a guess in a pie",
+             x=0.012, ha="left", fontsize=13, weight="medium")
+source = fig.text(0.012, -0.02,
+                  "Data: Gapminder, 2007. Top 8 countries; the rest pooled as “Other.”",
+                  fontsize=8, color="#8a8a8a")
+```
+
+Both panels show the same nine numbers. Only the bar lets you rank them at a glance — and the accent puts the
+two-country dominance where the eye lands first.
+
+::: {.callout-important}
+## Extract — M1 rules
+1. **Ask before you plot.** Say *"`<chart>` because `<shape>` + `<task>`"* before `plt.subplots`. The full
+   checklist, the *(shape × task) → chart* lookup, and the catalog live in `VISUALIZATION_GUIDE.md`.
+2. **Match the encoding to the task's *verb*, not the data's columns** — change → dumbbell/slope,
+   part-to-whole → sorted bar, relationship → scatter.
+3. **Look before you choose.** Summary statistics can't pick a chart (or a conclusion); only the data's shape
+   can — so plot it first.
+:::
+
 # Roadmap — the modules ahead {.unnumbered}
 
-M0 buys the mental model. The rest of the course turns it into reflexes; each module ends by distilling a rule
-into `house_style.py` / `VISUALIZATION_GUIDE.md`.
+M0 bought the mental model; M1 added the chart-choice reflex (and `VISUALIZATION_GUIDE.md`). The rest of the
+course keeps turning taste into reusable rules; each module ends by distilling one back into
+`house_style.py` / `VISUALIZATION_GUIDE.md`.
 
 | Module | Principle | You'll build |
 |---|---|---|
-| **M1 — Chart choice** | data shape → encoding; ask before coding | `VISUALIZATION_GUIDE.md` decision checklist + chart catalog |
 | **M2 — Layout & composition** | figure size/DPI as the master coordinate | `subplot_mosaic`, small multiples, an inset zoom |
 | **M3 — Typography** | type is half of "professional" | a title that states the takeaway with colour-keyed series words |
 | **M4 — Colour** | perceptual uniformity; grey + one accent | the same chart in three palette *types*; a centred diverging heatmap |
@@ -240,4 +430,5 @@ into `house_style.py` / `VISUALIZATION_GUIDE.md`.
 | **M6 — House style** | one theme, reused | a real `.mplstyle` + `apply_theme()` with `executive`/`detailed` modes |
 | **M7 — Composition capstone** | executive vs. detailed, multi-dataset | one dataset → two figures, exported as vector + 2× PNG |
 
-*Next:* **M1**, where the skill is the question you ask *before* a single line of plotting code.
+*Next:* **M2 — Layout & composition**, where the figure's size and DPI become the master coordinate that
+every mark, label, and margin is measured against.
