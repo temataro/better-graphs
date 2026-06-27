@@ -18,6 +18,8 @@ format:
     fig-dpi: 150
     fig-format: png
     theme: cosmo
+    output-file: index.html      # deploy entry point — the shared link lands on content
+    embed-resources: true        # one self-contained file (figures inlined); trivial to host
 execute:
   warning: false
   echo: true

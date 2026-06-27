@@ -1,0 +1,68 @@
+name: Publish curriculum to GitHub Pages
+
+# The datasets are gitignored (regenerable), so they are NOT in the repo. This is
+# the "get around no committed data" answer: CI rebuilds them from their public
+# sources every run, then renders the Quarto curriculum to a single self-contained
+# index.html and deploys it to Pages. Rendering goes through `uv run` so the qmd's
+# jupyter engine uses the project venv (matplotlib + house_style), not a bare system
+# Python — otherwise the build renders wrong or fails.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One in-flight deploy at a time; let a newer push supersede an older build.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (+ cache the env)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync the plotting + jupyter stack
+        run: uv sync
+
+      - name: Install Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Build datasets (regenerate the gitignored data in CI)
+        run: uv run python data/build_datasets.py
+
+      - name: Render the curriculum (jupyter engine via the uv venv)
+        run: uv run quarto render visualization-curriculum/better_graphs.qmd
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp visualization-curriculum/index.html _site/index.html
+          touch _site/.nojekyll   # tell Pages not to run Jekyll over the output
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
