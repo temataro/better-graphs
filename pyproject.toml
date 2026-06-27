@@ -1,0 +1,26 @@
+[project]
+name = "better-work-graphs"
+version = "0.1.0"
+description = "A matplotlib craft curriculum + reusable house style for Tufte-grade figures"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "pypalettes",
+    "highlight-text",
+]
+
+# Tooling needed only to render the Quarto curriculum (.qmd -> HTML) via the
+# jupyter engine. Installed by `uv sync` (the dev group is on by default).
+[dependency-groups]
+dev = [
+    "jupyter>=1.0",
+    "ipykernel>=6.29",
+]
+
+# This is a "workspace" of notebooks + a house-style module, not a distributable
+# package, so don't try to build/install the project itself.
+[tool.uv]
+package = false

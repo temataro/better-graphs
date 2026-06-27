@@ -1,0 +1,38 @@
+# figure
+figure.figsize: 7, 4.5
+figure.dpi: 110
+savefig.dpi: 200
+savefig.bbox: tight
+savefig.transparent: False
+
+# font / text  (softer than pure black reads more professional)
+# League Spartan ships in fonts/ and is registered by house_style on import.
+font.family: sans-serif
+font.sans-serif: League Spartan, DejaVu Sans, sans-serif
+font.size: 11
+axes.titlesize: 14
+axes.titleweight: bold
+axes.labelsize: 11
+text.color: 222222
+axes.labelcolor: 222222
+axes.titlecolor: 111111
+
+# spines / ticks
+axes.spines.top: False
+axes.spines.right: False
+xtick.color: 555555
+ytick.color: 555555
+xtick.direction: out
+ytick.direction: out
+
+# grid
+axes.grid: True
+axes.grid.axis: y
+grid.color: dddddd
+grid.linewidth: 0.8
+
+# legend
+legend.frameon: False
+
+# color cycle (replace with your palette)
+axes.prop_cycle: cycler('color', ['1f77b4','ff7f0e','2ca02c','d62728','9467bd','8c564b'])

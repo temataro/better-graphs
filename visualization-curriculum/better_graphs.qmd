@@ -1,0 +1,243 @@
+---
+title: "Better Graphs"
+subtitle: "A matplotlib craft curriculum — from competent defaults to charts that read as deliberate"
+author: "github.com/temataro"
+AI Assistance: "Claude Opus 4.8"
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-title: "Modules"
+    number-sections: true
+    number-depth: 2
+    code-tools: true
+    code-fold: false
+    code-overflow: wrap
+    fig-align: center
+    fig-dpi: 150
+    fig-format: png
+    theme: cosmo
+execute:
+  warning: false
+  echo: true
+jupyter: python3
+---
+
+## Preface — what this course is {.unnumbered}
+
+Most matplotlib output looks like matplotlib: boxed-in spines, a primary blue, a title that
+just repeats the y-axis label, and ticks at whatever round numbers the library guessed. Fixing
+that is **not a question of competence — it's a question of taste**, and taste can be written down
+as rules. This curriculum is the rulebook.
+
+Edward Tufte's *The Visual Display of Quantitative Information* is the north star: maximize the
+share of ink that carries data, cut the rest, and never let the chart mislead. Each module states
+**one principle**, builds **one thing**, and extracts **one durable rule** that gets folded back into
+the project's reusable artifacts (`CLAUDE.md`, `VISUALIZATION_GUIDE.md`, `house_style.py`) — so a
+future agent can produce the same quality with zero re-explanation.
+
+::: {.callout-tip}
+## How to read the code
+Every figure obeys the house rules: the object-oriented (OO) API, `apply_theme()` first, a title that
+states the *takeaway*, trimmed spines, and unit-aware ticks. The **only** exception is a counterexample
+that is explicitly labelled "the look we're escaping" — those keep matplotlib's raw defaults on purpose.
+:::
+
+```{python}
+#| label: setup
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator, MaxNLocator
+import house_style
+
+# Rule 0, applied once: the theme is the first plotting line.
+house_style.apply_theme("detailed")
+
+# The semantic-colour default we will defend all course: grey carries context,
+# exactly one accent carries the point.
+GREY = "#9e9e9e"
+ACCENT = "#d1495b"
+```
+
+# M0 — Environment & the mental model
+
+**Principle.** Almost all "ugly default" pain is really *fighting the pyplot state machine* — the
+`plt.plot`, `plt.title`, `plt.xlabel` style, where "the current axes" is invisible global state you can
+only nudge, never hold. The cure is one line, and it reorganizes everything that follows.
+
+## The pyplot state machine vs. holding handles
+
+The `plt.*` interface always draws on a hidden "current figure / current axes". That is convenient for a
+one-off in a REPL and a trap for anything real: you cannot point at the second of two axes, you cannot pass
+*the* line to a helper, and every tweak is a fresh global command hoping the right object is current.
+
+Hold the handles instead:
+
+```python
+fig, ax = plt.subplots()   # fig = the whole canvas;  ax = one plotting region
+ax.plot(x, y)              # operate on the OBJECT, not on hidden global state
+```
+
+`fig` and `ax` are real objects. You can store them, pass them around, ask them questions
+(`ax.get_xlim()`), and hand `ax` to a styling function. Everything below is a consequence of this.
+
+::: {.callout-important}
+## Extract — the OO-API rule
+Always `fig, ax = plt.subplots(constrained_layout=True)`. After that, **no `plt.*` plotting calls** —
+operate on `ax`/`fig`. The only `plt.*` you keep are `plt.subplots` itself and `plt.style.*`
+(both wrapped by `house_style.apply_theme`).
+:::
+
+## The look we're escaping
+
+Here is a perfectly ordinary chart drawn the perfectly ordinary way. Read it, then notice everything you
+have to *squint past*: the box of four spines, a default-blue line that means nothing, ticks at 0/2/4/…,
+a y-axis in bare thousands, and a title that just names the variable.
+
+```{python}
+#| label: ugly-default
+#| fig-cap: "Matplotlib's raw defaults — competent, anonymous, and a little hard to read."
+months = np.arange(1, 13)
+revenue = np.array([41, 38, 46, 52, 55, 61, 68, 64, 59, 50, 47, 44]) * 1000
+
+# A counterexample: defaults ON PURPOSE (note: no apply_theme, raw style context).
+with plt.style.context("default"):
+    fig, ax = plt.subplots()
+    ax.plot(months, revenue, marker="o")
+    ax.set_title("revenue")
+    ax.set_xlabel("month")
+    ax.set_ylabel("revenue")
+```
+
+## The same data, rebuilt on the OO API
+
+Same numbers, same five lines of plotting — but now every Artist is something we reached for on purpose.
+Grey carries the series; one accent point carries the message; the title states the *takeaway*; the spines
+are trimmed and offset; the y-axis reads in dollars; the peak is labelled directly so the eye never detours
+to a legend.
+
+```{python}
+#| label: oo-rebuild
+#| fig-cap: "Same data on the OO API: grey for context, one accent for the point, a title that says something."
+month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+peak = int(revenue.argmax())
+
+fig, ax = plt.subplots(constrained_layout=True)
+ax.plot(months, revenue, color=GREY, lw=2)                       # context series, in grey
+ax.plot(months[peak], revenue[peak], "o", color=ACCENT,         # the one point that matters
+        ms=9, zorder=5)
+
+house_style.takeaway_title(ax, f"Revenue peaked in {month_names[peak]}, then cooled into year-end")
+house_style.despine(ax)                                          # drop top/right, offset the rest
+house_style.thousands(ax, "y")                                   # 68000 -> 68,000
+
+ax.set_xticks(months)
+ax.set_xticklabels(month_names)
+ax.margins(x=0.02)
+
+# Direct label on the accent point — in DATA coordinates, offset a few points up.
+# (Keeping the handle both suppresses Jupyter's repr echo and proves the point:
+#  the annotation is just another Artist you can hold and re-`.set_*()` later.)
+peak_label = ax.annotate(f"${revenue[peak]:,.0f}",
+                         xy=(months[peak], revenue[peak]), xytext=(0, 12),
+                         textcoords="offset points", ha="center",
+                         color=ACCENT, fontweight="bold")
+```
+
+The difference is entirely in *which Artists we grabbed and what we set on them* — which is the whole game.
+
+## Figure → Axes → Artist: the hierarchy
+
+Three nested ideas explain the whole library:
+
+- **Figure** — the canvas. It owns the size, the DPI, and one or more Axes. Saving is a Figure operation
+  (`fig.savefig`).
+- **Axes** — one plotting region: its own data limits, ticks, labels, and spines. "Subplot" = one Axes.
+- **Artist** — *everything drawn is one*. Every line, marker, tick, label, spine, and patch is an `Artist`
+  you can grab and `.set_*()`. There is no styling you cannot reach this way.
+
+The figure below labels its own parts — and does the labelling in **axes-fraction** coordinates, which sets
+up the next idea.
+
+```{python}
+#| label: artist-hierarchy
+#| fig-cap: "Every visible thing is an Artist. Callouts are placed in axes-fraction coordinates."
+x = np.linspace(0, 10, 200)
+
+fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+(line,) = ax.plot(x, np.sin(x), color=ACCENT, lw=2)   # a Line2D Artist we keep a handle to
+ax.set_title("Everything you see is an Artist you can grab and .set_*()", loc="left")
+ax.set_xlabel("x"); ax.set_ylabel("sin(x)")
+
+def callout(text, point, label_at):
+    ax.annotate(text, xy=point, xycoords="axes fraction",
+                xytext=label_at, textcoords="axes fraction",
+                fontsize=9, color="#444444", ha="left",
+                arrowprops=dict(arrowstyle="->", color="#444444", lw=1))
+
+callout("Line2D — the data",          point=(0.32, 0.80), label_at=(0.06, 0.95))
+callout("Axes — the plotting region", point=(0.55, 0.50), label_at=(0.46, 0.22))
+callout("Spine",                      point=(0.00, 0.55), label_at=(0.10, 0.42))
+callout("Tick label",                 point=(0.00, 0.00), label_at=(0.10, 0.10))
+
+# fig.text places relative to the whole CANVAS (figure fraction), not this Axes.
+source_note = fig.text(0.99, 0.01, "fig.text() → figure-fraction coords",
+                       ha="right", va="bottom", fontsize=8, color=GREY)
+```
+
+## Coordinate systems & transforms
+
+When you place text or an arrow, you choose *which coordinate system the numbers mean*. matplotlib gives you
+four, and switching between them is the difference between "annotation glued to a data point" and
+"annotation glued to a corner of the panel":
+
+| System | What `(0.5, 0.5)` means | Reach it with |
+|---|---|---|
+| **data** | the middle of the *data range* (moves if the data changes) | default `xy=` |
+| **axes fraction** | the centre of *this Axes*, always | `xycoords="axes fraction"` / `transform=ax.transAxes` |
+| **figure fraction** | the centre of the *whole canvas* | `fig.text` / `transform=fig.transFigure` |
+| **display** | a pixel on screen | rarely by hand |
+
+The proof that axes-fraction is data-independent: the same `(0.5, 0.5)` lands in the same visual spot in both
+panels below, even though their y-ranges differ by 1000×.
+
+```{python}
+#| label: transforms-proof
+#| fig-cap: "Same axes-fraction point (0.5, 0.5) in both panels — identical position despite a 1000x data-range gap."
+fig, axes = plt.subplots(1, 2, figsize=(9, 3.4), constrained_layout=True)
+
+for ax, scale in zip(axes, [1, 1000]):
+    ax.plot(x, scale * np.sin(x), color=GREY)
+    ax.set_title(f"y range ≈ ±{scale}", loc="left", fontsize=11)
+    # transform=ax.transAxes makes these numbers mean "fraction of THIS axes".
+    ax.plot(0.5, 0.5, "o", color=ACCENT, ms=11, transform=ax.transAxes)
+    ax.text(0.5, 0.5, "   (0.5, 0.5) axes-fraction", transform=ax.transAxes,
+            va="center", color=ACCENT, fontsize=9)
+```
+
+::: {.callout-important}
+## Extract — M0 rules
+1. **Hold handles.** `fig, ax = plt.subplots(constrained_layout=True)`; never `plt.*` plotting afterward.
+2. **Everything is an Artist** — to change anything, grab it and `.set_*()`.
+3. **Pick the coordinate system deliberately** — data for things tied to values, axes-fraction for things
+   tied to the panel (titles, source notes, callouts that should not move with the data).
+:::
+
+# Roadmap — the modules ahead {.unnumbered}
+
+M0 buys the mental model. The rest of the course turns it into reflexes; each module ends by distilling a rule
+into `house_style.py` / `VISUALIZATION_GUIDE.md`.
+
+| Module | Principle | You'll build |
+|---|---|---|
+| **M1 — Chart choice** | data shape → encoding; ask before coding | `VISUALIZATION_GUIDE.md` decision checklist + chart catalog |
+| **M2 — Layout & composition** | figure size/DPI as the master coordinate | `subplot_mosaic`, small multiples, an inset zoom |
+| **M3 — Typography** | type is half of "professional" | a title that states the takeaway with colour-keyed series words |
+| **M4 — Colour** | perceptual uniformity; grey + one accent | the same chart in three palette *types*; a centred diverging heatmap |
+| **M5 — Polish** | Tufte's data-ink ratio | a reusable `polish(ax)` from an ordered spines/ticks/grid pass |
+| **M6 — House style** | one theme, reused | a real `.mplstyle` + `apply_theme()` with `executive`/`detailed` modes |
+| **M7 — Composition capstone** | executive vs. detailed, multi-dataset | one dataset → two figures, exported as vector + 2× PNG |
+
+*Next:* **M1**, where the skill is the question you ask *before* a single line of plotting code.

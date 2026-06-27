@@ -1,0 +1,19 @@
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+
+# Quarto build artifacts
+/.quarto/
+_site/
+*_files/
+*.html
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large reference PDF — kept on disk, not in history (regenerable/external)
+output.pdf
+
+# OS
+.DS_Store
