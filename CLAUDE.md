@@ -30,11 +30,13 @@ data) with the environment set up and working. What exists:
   on `main`.
 - `visualization-curriculum/house_style.py` — the theme/helpers module. `apply_theme()` loads
   `minerva.mplstyle` and is verified working (it previously pointed at a nonexistent `your_style.mplstyle`).
+- `visualization-curriculum/ndata.py` — numpy data layer (`load` → dict of arrays from `.npz`, plus
+  `select`/`group`/`pivot`/`rolling_mean`/`corr`/`std`/`finite`). The curriculum uses this, not pandas.
 - `visualization-curriculum/minerva.mplstyle` — base rcParams; the default font is **League Spartan**.
 - `visualization-curriculum/fonts/` — vendored League Spartan + Junction (The League of Movable Type, OFL).
   `house_style` registers them on import, so figures need no system font install.
 - `visualization-curriculum/better_graphs.qmd` — the curriculum source (Quarto → HTML); **M0–M4 written**.
-  Its M1 cells read `data/*.csv`, so build the datasets before rendering.
+  Its cells read `data/*.npz` via `ndata.load`, so build the datasets before rendering.
 - `VISUALIZATION_GUIDE.md` — the chart-choice decision framework (written in M1; see above).
 - `data/` — `build_datasets.py` (downloads + synthesizes the datasets) and `data/README.md` (provenance);
   these two are tracked. The data they produce (`data/raw/`, `data/*.csv`, `data/*.npz`) is gitignored and
@@ -72,7 +74,16 @@ Still planned but **not** present (per `PLAN.md`): `outputs/` and the chart buil
   per group, shared axes), never spaghetti. Zoom with an inset (`inset_axes` + `indicate_inset_zoom`).
 
 ### Libraries / stack
-matplotlib (OO API), numpy, pandas, pypalettes (palettes), highlight-text (titles).
+matplotlib (OO API), numpy, pypalettes (palettes), highlight-text (titles). **Curriculum data is numpy, not
+pandas** (see below); pandas is used only by `data/build_datasets.py` (one-time ETL).
+
+### Data & curriculum conventions
+- **Data is numpy, via `visualization-curriculum/ndata.py`.** `load(name)` returns a *dict of numpy arrays*
+  (a dataset's columns, read from the built `.npz`); helpers `select`, `group`, `pivot`, `rolling_mean`,
+  `corr`, `std`, `finite` cover the few table ops (NaN-aware, pandas-parity). Plotting cells do plain numpy —
+  `gap["lifeExp"][gap["year"] == 2007]`, never a DataFrame. Keep new data work in this style.
+- **Every curriculum module ends with a before/after figure on real data** (raw/wrong → house/right) that
+  distils the module's principle. Preserve this convention when adding M5–M7.
 
 ## Environment & commands
 
@@ -83,7 +94,7 @@ The env is uv-managed and git is initialized on `main`. There is no test/lint/CI
 - **Run in the env:** `uv run python ...` (e.g. `uv run python -c "import house_style"` from the
   `visualization-curriculum/` dir).
 - **Build datasets:** `uv run python data/build_datasets.py` (downloads via `curl` + synthesizes RF data).
-  **Run this before rendering** — the curriculum's M1 cells read `data/*.csv`, which are gitignored.
+  **Run this before rendering** — the curriculum's cells read `data/*.npz` (via `ndata`), which are gitignored.
 - **Render the curriculum:** `uv run quarto render visualization-curriculum/better_graphs.qmd`, or
   `uv run quarto preview visualization-curriculum/better_graphs.qmd` for live reload. Quarto uses the jupyter
   engine, so run it through `uv run` to pick up the venv kernel. Code cells `import house_style`, which

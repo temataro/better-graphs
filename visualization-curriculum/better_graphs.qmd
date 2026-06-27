@@ -63,24 +63,9 @@ ACCENT = "#6400FF"
 
 ```{python}
 #| label: data-helper
-from pathlib import Path
-import pandas as pd
-
-DATA = Path("../data")
-
-def load(name):
-    """Load a tidy dataset built by data/build_datasets.py.
-
-    The data is gitignored (regenerable), so a fresh clone has none yet. Fail with the
-    exact build command instead of a bare FileNotFoundError three frames deep.
-    """
-    path = DATA / f"{name}.csv"
-    if not path.exists():
-        raise FileNotFoundError(
-            f"{path} not found — the datasets are gitignored. Build them first:\n"
-            f"    uv run python data/build_datasets.py"
-        )
-    return pd.read_csv(path)
+# Data is numpy, not pandas. `load()` returns a dict of arrays (a dataset's columns);
+# the small helpers below cover the few table operations the figures need. See ndata.py.
+from ndata import load, select, group, pivot, rolling_mean, corr, std, finite, MONTHS
 ```
 
 # M0 — Environment & the mental model
@@ -250,16 +235,15 @@ beside a themed one in a single canvas, because the theme is global.
 ```{python}
 #| label: m0-capstone-before
 #| fig-cap: "Before — matplotlib's untouched defaults: boxed in, primary blue, a title that just renames the y-axis."
-MONTHS = ["January", "February", "March", "April", "May", "June",
-          "July", "August", "September", "October", "November", "December"]
-mnum = {m: i + 1 for i, m in enumerate(MONTHS)}
-flights = load("flights")
-flights["date"] = flights.year + (flights.month.map(mnum) - 1) / 12
-flights = flights.sort_values("date")
+fl = load("flights")
+month_idx = np.array([list(MONTHS).index(m) for m in fl["month"]])   # month name → 0..11
+date = fl["year"] + month_idx / 12
+order = np.argsort(date)
+date, passengers = date[order], fl["passengers"][order]
 
 with plt.style.context("default"):          # the only honest way to show raw defaults post-apply_theme
     fig, ax = plt.subplots()
-    ax.plot(flights.date, flights.passengers)
+    ax.plot(date, passengers)
     ax.set_title("Passengers")
     ax.set_xlabel("date")
     ylab = ax.set_ylabel("passengers")
@@ -269,15 +253,16 @@ with plt.style.context("default"):          # the only honest way to show raw de
 #| label: m0-capstone-after
 #| fig-cap: "After — the OO API under apply_theme: grey for context, the accent on the trend, a takeaway title, trimmed spines."
 fig, ax = plt.subplots(constrained_layout=True)
-ax.plot(flights.date, flights.passengers, color=GREY, lw=1.1)                 # the monthly series = context
+ax.plot(date, passengers, color=GREY, lw=1.1)                 # the monthly series = context
 
-trend = flights.passengers.rolling(12, center=True).mean()                   # the point: the trend
-ax.plot(flights.date, trend, color=ACCENT, lw=2.6)
+trend = rolling_mean(passengers, 12)                          # the point: the 12-month trend
+ax.plot(date, trend, color=ACCENT, lw=2.6)
 
+growth = passengers.max() / passengers.min()                  # compute the multiple, don't guess it
 house_style.despine(ax)
-house_style.takeaway_title(ax, "US air travel roughly 6×'d in a decade — and the summer peaks grew with it")
+house_style.takeaway_title(ax, f"US air travel roughly {growth:.0f}×'d in a decade — and the summer peaks grew with it")
 ax.set_xlabel("Year")
-trend_label = ax.annotate("12-month average", (flights.date.iloc[-30], trend.iloc[-30]),
+trend_label = ax.annotate("12-month average", (date[-30], trend[-30]),
                           color=ACCENT, fontsize=9, xytext=(8, -2), textcoords="offset points")
 source = fig.text(0.0, -0.02, "Data: classic airline-passenger counts, monthly 1949–1960.",
                   fontsize=8, color="#8a8a8a")
@@ -319,7 +304,7 @@ hardest lessons by doing each the wrong way first, on the project's real dataset
 
 ```{python}
 #| label: m1-data
-gap = load("gapminder")        # load() + pandas live in the data-helper cell up top
+gap = load("gapminder")        # dict of numpy arrays, one per column
 dino = load("datasaurus")
 ```
 
@@ -336,15 +321,16 @@ near-zero correlation — yet wildly different shapes.
 picks = ["dino", "star", "bullseye", "x_shape"]
 
 # Compute the shared statistics from the data — never transcribe remembered constants.
-d0 = dino[dino.dataset == picks[0]]
-mx, my, sx, sy = d0.x.mean(), d0.y.mean(), d0.x.std(), d0.y.std()
-r = d0.x.corr(d0.y)
+pick0 = dino["dataset"] == picks[0]
+mx, my = dino["x"][pick0].mean(), dino["y"][pick0].mean()
+sx, sy = std(dino["x"][pick0]), std(dino["y"][pick0])
+r = corr(dino["x"][pick0], dino["y"][pick0])
 
 fig, axes = plt.subplots(2, 2, figsize=(8, 7.6), sharex=True, sharey=True,
                          constrained_layout=True)
 for ax, name in zip(axes.flat, picks):
-    sub = dino[dino.dataset == name]
-    ax.scatter(sub.x, sub.y, s=14, color=GREY, alpha=0.85, edgecolor="none")
+    sub = dino["dataset"] == name
+    ax.scatter(dino["x"][sub], dino["y"][sub], s=14, color=GREY, alpha=0.85, edgecolor="none")
     ax.set_title(name, loc="left", fontsize=11, color=ACCENT)
     ax.set_xticks([]); ax.set_yticks([])
 
@@ -372,35 +358,38 @@ directly: it **is** the segment between the two dots.
 #| label: m1-dumbbell
 #| fig-cap: "Same numbers, two encodings. Grouped bars make you subtract; the dumbbell shows the change — and the exception."
 countries = ["China", "Indonesia", "Brazil", "India", "Botswana", "Ethiopia", "Zimbabwe"]
-pair = (gap[gap.country.isin(countries) & gap.year.isin([1952, 2007])]
-        .pivot(index="country", columns="year", values="lifeExp")
-        .sort_values(2007))
-y = np.arange(len(pair))
-rose = (pair[2007] >= pair[1952]).to_numpy()        # True except where it fell
-mark = np.where(rose, GREY, ACCENT)                 # one accent: the country that fell
+sel = np.isin(gap["country"], countries) & np.isin(gap["year"], [1952, 2007])
+names, _, M = pivot(gap["country"][sel], gap["year"][sel], gap["lifeExp"][sel],
+                    rows=countries, cols=[1952, 2007])
+order = np.argsort(M[:, 1])                          # sort by the 2007 value
+names, M = names[order], M[order]
+v1952, v2007 = M[:, 0], M[:, 1]
+y = np.arange(len(names))
+rose = v2007 >= v1952                                # True except where it fell
+mark = np.where(rose, GREY, ACCENT)                  # one accent: the country that fell
 
 fig, (bad, good) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True)
 
 # WRONG — grouped bars: tall and honest, but "how much did it CHANGE?" is buried.
 h = 0.4
-bad.barh(y - h / 2, pair[1952], height=h, color="#cfcfcf", label="1952")
-bad.barh(y + h / 2, pair[2007], height=h, color=GREY, label="2007")
-bad.set_yticks(y); bad.set_yticklabels(pair.index)
+bad.barh(y - h / 2, v1952, height=h, color="#cfcfcf", label="1952")
+bad.barh(y + h / 2, v2007, height=h, color=GREY, label="2007")
+bad.set_yticks(y); bad.set_yticklabels(names)
 bad.set_xlabel("Life expectancy (years)")
 bad.set_title("Grouped bars — find the change", loc="left", fontsize=11)
 bad.legend(loc="lower right", frameon=False, fontsize=8)
 
 # RIGHT — dumbbell: the connecting segment IS the change; colour flags the one exception.
-good.hlines(y, pair[1952], pair[2007], color=mark, lw=2.4, zorder=1)
-good.scatter(pair[1952], y, color="#cfcfcf", s=44, zorder=2)
-good.scatter(pair[2007], y, color=mark, s=60, zorder=3)
-good.set_yticks(y); good.set_yticklabels(pair.index)
+good.hlines(y, v1952, v2007, color=mark, lw=2.4, zorder=1)
+good.scatter(v1952, y, color="#cfcfcf", s=44, zorder=2)
+good.scatter(v2007, y, color=mark, s=60, zorder=3)
+good.set_yticks(y); good.set_yticklabels(names)
 good.set_xlabel("Life expectancy (years)")
 good.set_title("Dumbbell — and Zimbabwe is the one that fell", loc="left", fontsize=11)
-top = len(pair) - 1
-end_52 = good.annotate("1952", (pair[1952].iloc[top], top), textcoords="offset points",
+top = len(names) - 1
+end_52 = good.annotate("1952", (v1952[top], top), textcoords="offset points",
                        xytext=(0, 10), ha="center", fontsize=8, color="#8a8a8a")
-end_07 = good.annotate("2007", (pair[2007].iloc[top], top), textcoords="offset points",
+end_07 = good.annotate("2007", (v2007[top], top), textcoords="offset points",
                        xytext=(0, 10), ha="center", fontsize=8, color=GREY)
 
 fig.suptitle("Life expectancy rose across the developing world from 1952 to 2007 — Zimbabwe is the exception",
@@ -420,27 +409,34 @@ which is why the house rule is *no pie beyond ~5 slices* (`CLAUDE.md`).
 ```{python}
 #| label: m1-partwhole
 #| fig-cap: "World population 2007 by country. The pie hides the ranking the sorted bar makes obvious."
-pop07 = gap[gap.year == 2007].groupby("country")["pop"].sum().sort_values(ascending=False)
-parts = pd.concat([pop07.head(8), pd.Series({"Other": pop07.iloc[8:].sum()})])
-share = (100 * parts / parts.sum()).sort_values()   # ascending → longest bar on top
+# In 2007 each country appears once, so its row IS its population — sort, take the top 8, pool the rest.
+m07 = gap["year"] == 2007
+country, pop = gap["country"][m07], gap["pop"][m07]
+desc = np.argsort(pop)[::-1]
+country, pop = country[desc], pop[desc]
+part_names = np.append(country[:8], "Other")
+part_vals = np.append(pop[:8], pop[8:].sum())
+part_share = 100 * part_vals / part_vals.sum()
 
 fig, (bad, good) = plt.subplots(1, 2, figsize=(11, 5), constrained_layout=True)
 
 # WRONG — pie: nine wedges, a legend, and you still can't rank them by eye.
-greys = plt.cm.Greys(np.linspace(0.2, 0.85, len(parts)))
-wedges, texts, autos = bad.pie(parts, labels=parts.index, autopct="%1.0f%%", colors=greys,
+greys = plt.cm.Greys(np.linspace(0.2, 0.85, len(part_vals)))
+wedges, texts, autos = bad.pie(part_vals, labels=part_names, autopct="%1.0f%%", colors=greys,
                                startangle=90, textprops={"fontsize": 8})
 bad.set_title("Pie — now rank these", loc="left", fontsize=11)
 
 # RIGHT — sorted bar of shares: ranking and magnitude in one read; accent the two giants.
+so = np.argsort(part_share)                          # ascending → longest bar on top
+labels, share = part_names[so], part_share[so]
 yb = np.arange(len(share))
-mark = [ACCENT if c in ("China", "India") else GREY for c in share.index]
-good.barh(yb, share.to_numpy(), color=mark)
-good.set_yticks(yb); good.set_yticklabels(share.index)
+mark = [ACCENT if c in ("China", "India") else GREY for c in labels]
+good.barh(yb, share, color=mark)
+good.set_yticks(yb); good.set_yticklabels(labels)
 good.set_xlabel("Share of world population, 2007 (%)")
 good.set_title("Sorted bar — the order reads itself", loc="left", fontsize=11)
 good.margins(x=0.14)
-for yi, v in zip(yb, share.to_numpy()):
+for yi, v in zip(yb, share):
     good.annotate(f"{v:.0f}%", (v, yi), xytext=(4, 0), textcoords="offset points",
                   va="center", fontsize=8, color="#5a5a5a")
 
@@ -463,23 +459,24 @@ scatter answers the one we asked — and the cluster structure falls out for fre
 ```{python}
 #| label: m1-capstone
 #| fig-cap: "Same question — how do flipper length and mass relate? A bar of means can't answer it; a scatter can."
-peng = load("penguins").dropna(subset=["species", "flipper_length_mm", "body_mass_g"])
+peng = load("penguins")
+peng = select(peng, finite(peng["flipper_length_mm"], peng["body_mass_g"]))   # ≈ dropna
 species = ["Adelie", "Chinstrap", "Gentoo"]
 palette = {"Adelie": ACCENT, "Chinstrap": "#E8833A", "Gentoo": "#1AA7A0"}   # 3 real series → 3 colours
 
 fig, (bad, good) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True)
 
 # BEFORE — bar of mean mass: a true fact, but it answers the wrong question.
-means = peng.groupby("species")["body_mass_g"].mean().reindex(species)
-bad.bar(species, means.to_numpy(), color=GREY)
+_, means = group(peng["species"], peng["body_mass_g"], np.nanmean, order=species)
+bad.bar(species, means, color=GREY)
 bad.set_ylabel("Mean body mass (g)")
 bad.set_title("Bar of means — no relationship in sight", loc="left", fontsize=11)
 house_style.despine(bad); house_style.thousands(bad, "y")
 
 # AFTER — scatter by species: the relationship and the clusters both appear.
 for sp in species:
-    s = peng[peng.species == sp]
-    good.scatter(s.flipper_length_mm, s.body_mass_g, s=20, color=palette[sp],
+    s = peng["species"] == sp
+    good.scatter(peng["flipper_length_mm"][s], peng["body_mass_g"][s], s=20, color=palette[sp],
                  alpha=0.8, edgecolor="none", label=sp)
 good.set_xlabel("Flipper length (mm)")
 good.set_ylabel("Body mass (g)")
@@ -489,7 +486,7 @@ good.legend(frameon=False, fontsize=8, loc="upper left")
 
 fig.suptitle("Match the chart to the question: a relationship wants a scatter, not a bar of means",
              x=0.012, ha="left", fontsize=13, weight="medium")
-source = fig.text(0.012, -0.02, f"Data: Palmer penguins (n={len(peng)} after dropping incomplete rows).",
+source = fig.text(0.012, -0.02, f"Data: Palmer penguins (n={len(peng['species'])} after dropping incomplete rows).",
                   fontsize=8, color="#8a8a8a")
 ```
 
@@ -522,7 +519,7 @@ craft is sharing **one colour encoding** across them so the eye carries meaning 
 ```{python}
 #| label: m2-mosaic
 #| fig-cap: "subplot_mosaic: a main view plus two context panels, with a single continent colour key shared across them."
-g07 = gap[gap.year == 2007]
+g07 = select(gap, gap["year"] == 2007)
 CONT_COLORS = {"Africa": "#6400FF", "Americas": "#E8833A", "Asia": "#1AA7A0",
                "Europe": "#C44E9C", "Oceania": "#5A8F3C"}
 
@@ -532,8 +529,8 @@ fig, axd = plt.subplot_mosaic("AB\nAC", figsize=(10, 5.4), constrained_layout=Tr
 # A — the main view: wealth vs health, bubble area ∝ population, colour = continent.
 A = axd["A"]
 for cont, c in CONT_COLORS.items():
-    d = g07[g07.continent == cont]
-    A.scatter(d.gdpPercap, d.lifeExp, s=np.sqrt(d["pop"]) / 200, color=c,
+    dm = g07["continent"] == cont
+    A.scatter(g07["gdpPercap"][dm], g07["lifeExp"][dm], s=np.sqrt(g07["pop"][dm]) / 200, color=c,
               alpha=0.75, edgecolor="white", linewidth=0.3, label=cont)
 A.set_xscale("log")
 A.set_xlabel("GDP per capita (log scale, $)")
@@ -544,15 +541,16 @@ A.legend(frameon=False, fontsize=7, loc="lower right", ncol=2)
 
 # B — context: the distribution of the y variable.
 B = axd["B"]
-B.hist(g07.lifeExp, bins=12, color=GREY)
+B.hist(g07["lifeExp"], bins=12, color=GREY)
 B.set_title("Distribution", loc="left", fontsize=10)
 house_style.despine(B)
 
 # C — context: median by continent, the SAME colour key as A.
 C = axd["C"]
-medc = g07.groupby("continent").lifeExp.median().sort_values()
-C.barh(range(len(medc)), medc.to_numpy(), color=[CONT_COLORS[c] for c in medc.index])
-C.set_yticks(range(len(medc))); C.set_yticklabels(medc.index, fontsize=8)
+conts, medc = group(g07["continent"], g07["lifeExp"], np.nanmedian)
+o = np.argsort(medc); conts, medc = conts[o], medc[o]
+C.barh(range(len(medc)), medc, color=[CONT_COLORS[c] for c in conts])
+C.set_yticks(range(len(medc))); C.set_yticklabels(conts, fontsize=8)
 C.set_title("Median, by continent", loc="left", fontsize=10)
 house_style.despine(C)
 
@@ -568,16 +566,19 @@ not by eye.
 #| label: m2-inset
 #| fig-cap: "An inset magnifies the passband peak of a measured S21 trace while the overview stays put."
 rf = load("rf_ring_slot")
-fig, ax = plt.subplots(figsize=(9, 4.4), constrained_layout=True)
-ax.plot(rf.freq_ghz, rf.s21_db, color=GREY, lw=1.4)
+freq = rf["freq_ghz"]
+s21_db = 20 * np.log10(np.abs(rf["s21"]))   # magnitude in dB, straight from the complex S-parameter
 
-i = rf.s21_db.idxmax()                      # zoom on the passband peak — computed, not eyeballed
-f0 = rf.freq_ghz[i]
-band = (rf.freq_ghz >= f0 - 3) & (rf.freq_ghz <= f0 + 3)
+fig, ax = plt.subplots(figsize=(9, 4.4), constrained_layout=True)
+ax.plot(freq, s21_db, color=GREY, lw=1.4)
+
+i = np.argmax(s21_db)                        # zoom on the passband peak — computed, not eyeballed
+f0 = freq[i]
+band = (freq >= f0 - 3) & (freq <= f0 + 3)
 
 axins = ax.inset_axes([0.57, 0.12, 0.39, 0.46])
-axins.plot(rf.freq_ghz[band], rf.s21_db[band], color=ACCENT, lw=1.8)
-axins.scatter([f0], [rf.s21_db[i]], color=ACCENT, zorder=3)
+axins.plot(freq[band], s21_db[band], color=ACCENT, lw=1.8)
+axins.scatter([f0], [s21_db[i]], color=ACCENT, zorder=3)
 axins.set_title(f"passband peak ≈ {f0:.0f} GHz", loc="left", fontsize=9, color=ACCENT)
 axins.tick_params(labelsize=7)
 ax.indicate_inset_zoom(axins, edgecolor="#999999")
@@ -598,8 +599,10 @@ The most common layout failure is forcing many series into one axes. Same data, 
 #| label: m2-capstone-before
 #| fig-cap: "Before — every country's trajectory in one axes. All the data is here; none of it is readable."
 fig, ax = plt.subplots(figsize=(7, 4.2), constrained_layout=True)
-for _, d in gap.groupby("country"):
-    ax.plot(d.year, d.lifeExp, color=GREY, lw=0.6, alpha=0.5)
+for c in np.unique(gap["country"]):
+    m = gap["country"] == c
+    o = np.argsort(gap["year"][m])
+    ax.plot(gap["year"][m][o], gap["lifeExp"][m][o], color=GREY, lw=0.6, alpha=0.5)
 ax.set_xlabel("Year")
 ax.set_ylabel("Life expectancy (years)")
 ax.set_title("All countries, one axes — spaghetti", loc="left", fontsize=11)
@@ -613,11 +616,13 @@ note = fig.text(0.0, -0.02, "Data: Gapminder, 1952–2007.", fontsize=8, color="
 continents = ["Africa", "Americas", "Asia", "Europe", "Oceania"]
 fig, axes = plt.subplots(1, 5, figsize=(12, 3.0), sharey=True, constrained_layout=True)
 for ax, cont in zip(axes, continents):
-    sub = gap[gap.continent == cont]
-    for _, d in sub.groupby("country"):
-        ax.plot(d.year, d.lifeExp, color="#dadada", lw=0.7)
-    med = sub.groupby("year").lifeExp.median()
-    ax.plot(med.index, med.to_numpy(), color=ACCENT, lw=2.4)
+    cm = gap["continent"] == cont
+    for c in np.unique(gap["country"][cm]):
+        m = cm & (gap["country"] == c)
+        o = np.argsort(gap["year"][m])
+        ax.plot(gap["year"][m][o], gap["lifeExp"][m][o], color="#dadada", lw=0.7)
+    yrs, med = group(gap["year"][cm], gap["lifeExp"][cm], np.nanmedian)
+    ax.plot(yrs, med, color=ACCENT, lw=2.4)
     ax.set_title(cont, loc="left", fontsize=11)
     ax.set_xticks([1952, 2007])
     house_style.despine(ax)
@@ -652,18 +657,19 @@ plot to decode a key. `house_style.takeaway_title(ax, message, highlight=[...])`
 ```{python}
 #| label: m3-keyed
 #| fig-cap: "Each country's name is coloured to its line — no legend box, no round-trip for the eye."
-pair = gap[gap.country.isin(["China", "Brazil"])]
 colors = {"China": ACCENT, "Brazil": "#1AA7A0"}
 
 fig, ax = plt.subplots(figsize=(8, 4.4), constrained_layout=True)
-for c, d in pair.groupby("country"):
-    ax.plot(d.year, d.lifeExp, color=colors[c], lw=2.6)
+for c in colors:
+    m = gap["country"] == c
+    o = np.argsort(gap["year"][m])
+    ax.plot(gap["year"][m][o], gap["lifeExp"][m][o], color=colors[c], lw=2.6)
 house_style.despine(ax)
 ax.set_xlabel("Year")
 ax.set_ylabel("Life expectancy (years)")
 
 def lifeexp(country, year):
-    return pair[(pair.country == country) & (pair.year == year)].lifeExp.iloc[0]
+    return gap["lifeExp"][(gap["country"] == country) & (gap["year"] == year)][0]
 behind = lifeexp("Brazil", 1952) - lifeexp("China", 1952)          # compute the gap, don't guess it
 
 house_style.takeaway_title(
@@ -682,9 +688,9 @@ keys the species into the words.
 ```{python}
 #| label: m3-capstone
 #| fig-cap: "Typography is decisions, not fonts: the takeaway title + colour-keyed words replace a redundant title and a legend box."
-ad = peng[peng.species == "Adelie"].body_mass_g
-ge = peng[peng.species == "Gentoo"].body_mass_g
-pct = round(100 * (ge.mean() / ad.mean() - 1))
+ad = peng["body_mass_g"][peng["species"] == "Adelie"]
+ge = peng["body_mass_g"][peng["species"] == "Gentoo"]
+pct = round(100 * (np.nanmean(ge) / np.nanmean(ad) - 1))
 cA, cG = ACCENT, "#1AA7A0"
 
 fig, (before, after) = plt.subplots(1, 2, figsize=(11, 4.4), constrained_layout=True, sharey=True)
@@ -705,7 +711,7 @@ house_style.takeaway_title(
     after, f"<Gentoo> outweigh <Adelie> by about {pct}%",
     highlight=[{"color": cG, "weight": "bold"}, {"color": cA, "weight": "bold"}])
 
-source = fig.text(0.0, -0.02, f"Data: Palmer penguins (Adelie n={ad.notna().sum()}, Gentoo n={ge.notna().sum()}).",
+source = fig.text(0.0, -0.02, f"Data: Palmer penguins (Adelie n={len(ad)}, Gentoo n={len(ge)}).",
                   fontsize=8, color="#8a8a8a")
 ```
 
@@ -734,8 +740,10 @@ The same five bars, coloured three ways — each palette type answers a *differe
 ```{python}
 #| label: m4-three-types
 #| fig-cap: "One bar chart, three palette TYPES: naming the groups, encoding magnitude, or showing deviation."
-medc = gap[gap.year == 2007].groupby("continent").lifeExp.median().sort_values()
-labels, vals, yb = medc.index.to_list(), medc.to_numpy(), np.arange(len(medc))
+m07 = gap["year"] == 2007
+labels, vals = group(gap["continent"][m07], gap["lifeExp"][m07], np.nanmedian)
+o = np.argsort(vals); labels, vals = labels[o], vals[o]
+yb = np.arange(len(vals))
 
 fig, axes = plt.subplots(1, 3, figsize=(12, 3.6), constrained_layout=True, sharey=True)
 
@@ -774,14 +782,14 @@ zero, so white means "average" and the two hues are honestly symmetric.
 #| label: m4-diverging
 #| fig-cap: "Each cell = a month's passengers minus that year's mean; RdBu_r on a symmetric, zero-centred norm."
 fl = load("flights")
-mat = fl.pivot(index="month", columns="year", values="passengers").reindex(MONTHS)
-anom = mat.sub(mat.mean(axis=0), axis=1)        # deviation from each year's mean → signed, centred at 0
+_, years, mat = pivot(fl["month"], fl["year"], fl["passengers"],
+                      rows=MONTHS, cols=np.unique(fl["year"]))        # months × years, calendar order
+anom = mat - np.nanmean(mat, axis=0, keepdims=True)   # each month minus its year's mean → signed, centred at 0
 
 fig, ax = plt.subplots(figsize=(9, 4.6), constrained_layout=True)
-im = ax.imshow(anom.to_numpy(), aspect="auto", cmap="RdBu_r",
-               norm=house_style.diverging_norm(anom.to_numpy(), 0))
+im = ax.imshow(anom, aspect="auto", cmap="RdBu_r", norm=house_style.diverging_norm(anom, 0))
 ax.set_yticks(range(len(MONTHS))); ax.set_yticklabels([m[:3] for m in MONTHS], fontsize=8)
-ax.set_xticks(range(len(anom.columns))); ax.set_xticklabels(anom.columns, fontsize=8, rotation=45)
+ax.set_xticks(range(len(years))); ax.set_xticklabels(years, fontsize=8, rotation=45)
 ax.set_xlabel("Year")
 ax.grid(False)        # no gridlines bleeding over the heatmap cells
 house_style.takeaway_title(ax, "Air travel runs hot in summer, cold in winter — and the swing widens over the decade")
@@ -798,7 +806,7 @@ The most common colour crime: a rainbow ramp on sequential data. Same passenger 
 #| label: m4-capstone
 #| fig-cap: "Sequential data wants a perceptually-uniform ramp: jet invents bands that aren't in the data; viridis doesn't."
 fig, (before, after) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True, sharey=True)
-M = mat.to_numpy()
+M = mat                                             # the raw passenger matrix from the cell above
 
 im0 = before.imshow(M, aspect="auto", cmap="jet")
 before.set_title("jet — false boundaries, not uniform", loc="left", fontsize=11)
@@ -810,8 +818,8 @@ house_style.add_colorbar(fig, im1, after)
 
 for ax in (before, after):
     ax.set_yticks(range(len(MONTHS))); ax.set_yticklabels([m[:3] for m in MONTHS], fontsize=7)
-    ax.set_xticks([0, len(mat.columns) - 1])
-    ax.set_xticklabels([mat.columns.min(), mat.columns.max()], fontsize=8)
+    ax.set_xticks([0, len(years) - 1])
+    ax.set_xticklabels([years.min(), years.max()], fontsize=8)
     ax.set_xlabel("Year")
     ax.grid(False)        # no gridlines bleeding over the heatmap cells
 fig.suptitle("Sequential data wants a perceptually-uniform ramp — viridis, not jet",
