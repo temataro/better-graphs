@@ -15,6 +15,10 @@ _site/
 # Large reference PDF — kept on disk, not in history (regenerable/external)
 output.pdf
 
+# Exported figures (house_style.save_all) are regenerable byproducts of rendering the
+# curriculum — the export CODE is the deliverable, not the binaries.
+outputs/
+
 # Datasets are regenerable via data/build_datasets.py, so keep them out of git.
 # The build script + data/README.md ARE tracked; the data they produce is not.
 data/raw/

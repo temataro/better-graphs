@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 from matplotlib import font_manager as fm
-from matplotlib.ticker import FuncFormatter
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 from matplotlib.colors import TwoSlopeNorm
 
 STYLE = Path(__file__).with_name("minerva.mplstyle")
@@ -43,7 +43,8 @@ def apply_theme(mode: str = "detailed") -> None:
         plt.rcParams.update({"axes.grid": False, "axes.titlesize": 16, "figure.figsize": (8, 4.5)})
     elif mode == "detailed":
         plt.rcParams.update({"axes.grid": True, "figure.figsize": (9, 6)})
-    # TODO (M7): add a 'print' mode — vector defaults, embedded fonts (pdf.fonttype=42).
+    # 'executive'/'detailed' are *look* modes. Vector/embedded-font *export* is a separate
+    # concern — see save_all(), which sets pdf/svg font handling only at savefig time.
 
 def despine(ax, keep=("left", "bottom"), outward=8):
     """M5 polish: drop unused spines, offset the kept ones (range-frame look)."""
@@ -52,6 +53,24 @@ def despine(ax, keep=("left", "bottom"), outward=8):
         if side in keep and outward:
             spine.set_position(("outward", outward))
     return ax
+
+def polish(ax, grid="y", nbins=5, outward=8, margins=None):
+    """M5 data-ink pass, in order: trim+offset spines, fewer/rounder ticks, grid behind.
+
+    `grid` names the *value* axis ("y" for vertical series, "x" for horizontal bars) — it
+    gets a `MaxNLocator` and the only gridlines; the categorical axis is left alone (so bar
+    positions aren't relocated). Pass `grid=None` for no grid at all. Composes `despine`.
+    """
+    despine(ax, outward=outward)
+    ax.grid(False)
+    if grid in ("x", "y"):
+        getattr(ax, f"{grid}axis").set_major_locator(MaxNLocator(nbins=nbins))
+        ax.grid(axis=grid, visible=True)
+        ax.set_axisbelow(True)
+    if margins is not None:
+        ax.margins(**margins)
+    return ax
+
 
 def thousands(ax, axis="y"):
     """Unit-aware tick formatting you always forget to add."""
@@ -95,5 +114,25 @@ def takeaway_title(ax, message, sub=None, highlight=None, y=1.06, fontsize=13):
         ax.text(0, 1.02, sub, transform=ax.transAxes, fontsize=10, color="#666666")
     return ax
 
-# TODO (M7): chart builders — bar(), line(), slope(), dumbbell(), dist(), heatmap()
+def save_all(fig, stem, outdir="../outputs", dpi=200, formats=("svg", "pdf", "png")):
+    """Export one figure as both print and web assets; returns the written paths.
+
+    PDF embeds a font subset (`pdf.fonttype=42` → text stays selectable); SVG converts
+    text to paths (`svg.fonttype='path'` → renders identically anywhere, no font install);
+    PNG is the 2x-dpi web raster. These are *output-only* settings, so they live in an
+    `rc_context` and never touch the on-screen theme — export is a save concern, not a look.
+    """
+    out_dir = Path(outdir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    export_rc = {"pdf.fonttype": 42, "ps.fonttype": 42, "svg.fonttype": "path"}
+    written = []
+    with plt.rc_context(export_rc):
+        for ext in formats:
+            path = out_dir / f"{stem}.{ext}"
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            written.append(path)
+    return written
+
+
+# TODO (M7+): chart builders — bar(), line(), slope(), dumbbell(), dist(), heatmap()
 # each returning (fig, ax) with theme + polish already applied.

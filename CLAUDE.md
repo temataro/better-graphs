@@ -12,8 +12,8 @@ make professional, Tufte-grade matplotlib figures with zero re-explanation. The 
 - **`VISUALIZATION_GUIDE.md`** — the chart-choice decision framework: the 10 rules, a pre-flight checklist, a
   *(data shape × task) → chart* lookup, and a chart catalog (when to use / when not / the anti-pattern).
 - **`visualization-curriculum/house_style.py`** — the one-line lever agents call: `apply_theme()`, `despine()`,
-  `thousands()`, `add_colorbar()`, `outlined_text()`, `takeaway_title(highlight=…)`, `diverging_norm()`, the
-  `CATEGORICAL`/`ACCENT`/`GREY` palette, and (eventually) chart builders.
+  `polish()`, `thousands()`, `add_colorbar()`, `outlined_text()`, `takeaway_title(highlight=…)`,
+  `diverging_norm()`, `save_all()`, the `CATEGORICAL`/`ACCENT`/`GREY` palette, and (eventually) chart builders.
 
 Charts are byproducts; when you build one, the goal is to **extract the reusable rule** back into these three
 files. `PLAN.md` is the full module-by-module roadmap (M0–M7); read it before substantive work — each module
@@ -21,10 +21,10 @@ states a principle, a thing to build, and a rule to extract. The `visualization-
 Quarto-rendered course (the eventual `.qmd` → HTML) meant as worked-example inspiration for *less capable*
 future agents; `.ipynb` files are byproducts of that, not the working surface.
 
-## Current state (most of `PLAN.md`'s layout does not exist yet)
+## Current state
 
-This repo is at **M4 stage** (M0–M4 of the curriculum are written, each ending with a before/after on real
-data) with the environment set up and working. What exists:
+The curriculum is **complete: M0–M7 are written**, each ending with a before/after on real data and a rule
+distilled back into the three durable artifacts. The environment is set up and working. What exists:
 
 - `pyproject.toml` + uv-managed `.venv/` + `uv.lock` — the plotting stack is installed; git is initialized
   on `main`.
@@ -35,7 +35,7 @@ data) with the environment set up and working. What exists:
 - `visualization-curriculum/minerva.mplstyle` — base rcParams; the default font is **League Spartan**.
 - `visualization-curriculum/fonts/` — vendored League Spartan + Junction (The League of Movable Type, OFL).
   `house_style` registers them on import, so figures need no system font install.
-- `visualization-curriculum/better_graphs.qmd` — the curriculum source (Quarto → HTML); **M0–M4 written**.
+- `visualization-curriculum/better_graphs.qmd` — the curriculum source (Quarto → HTML); **M0–M7 written**.
   Its cells read `data/*.npz` via `ndata.load`, so build the datasets before rendering.
 - `VISUALIZATION_GUIDE.md` — the chart-choice decision framework (written in M1; see above).
 - `data/` — `build_datasets.py` (downloads + synthesizes the datasets) and `data/README.md` (provenance);
@@ -43,7 +43,10 @@ data) with the environment set up and working. What exists:
   regenerated on demand: `uv run python data/build_datasets.py`.
 - `PLAN.md`, `README.md`, `output.pdf` (a 9-page PDF reference, ~41 MB).
 
-Still planned but **not** present (per `PLAN.md`): `outputs/` and the chart builders inside `house_style.py`
+- `outputs/` — exported figures (`house_style.save_all` writes `<stem>.{svg,pdf,png}` here). Gitignored and
+  regenerated on render, like `data/` — the export *code* is the deliverable, not the binaries.
+
+Still planned but **not** present (per `PLAN.md`): the chart builders inside `house_style.py`
 (`bar()`, `line()`, `slope()`, `dumbbell()`, `dist()`, `heatmap()`). Don't assume these exist.
 
 ## Charting rules (the operating manual)
@@ -57,9 +60,10 @@ Still planned but **not** present (per `PLAN.md`): `outputs/` and the chart buil
 4. TITLE states the takeaway, not the axis names. Colour-key the series words into it:
    `takeaway_title(ax, msg, highlight=[{"color": c1}, ...])` (wraps highlight_text) — a coloured word in the
    sentence beats a legend box.
-5. Polish: offset/trim spines; set tick locators + unit-aware formatters; grid discipline; direct labels.
-6. Export: vector (SVG or PDF) for print/slides AND PNG at dpi=200 for web; bbox_inches='tight'.
-   Dense scatter/large N → rasterized=True with a high savefig dpi.
+5. Polish: `house_style.polish(ax, grid="y"|"x")` runs the ordered pass — offset/trim spines, `MaxNLocator`
+   on the value axis, grid behind the data, margins. Then unit-aware formatters + direct labels.
+6. Export with `house_style.save_all(fig, stem)`: vector (SVG+PDF) for print/slides AND PNG at 2× dpi for web,
+   all `bbox_inches='tight'`. Dense scatter/large N → rasterized=True with a high savefig dpi.
 
 ### Hard rules
 - No pie beyond ~5 slices. No dual-y-axis unless units truly differ (label + color both axes).
@@ -81,9 +85,20 @@ pandas** (see below); pandas is used only by `data/build_datasets.py` (one-time 
 - **Data is numpy, via `visualization-curriculum/ndata.py`.** `load(name)` returns a *dict of numpy arrays*
   (a dataset's columns, read from the built `.npz`); helpers `select`, `group`, `pivot`, `rolling_mean`,
   `corr`, `std`, `finite` cover the few table ops (NaN-aware, pandas-parity). Plotting cells do plain numpy —
-  `gap["lifeExp"][gap["year"] == 2007]`, never a DataFrame. Keep new data work in this style.
+  `gapminder["lifeExp"][gapminder["year"] == 2007]`, never a DataFrame. Keep new data work in this style.
 - **Every curriculum module ends with a before/after figure on real data** (raw/wrong → house/right) that
-  distils the module's principle. Preserve this convention when adding M5–M7.
+  distils the module's principle. Preserve this convention when adding modules.
+- **Snippet code style — names that read like the chart, black-*style* readability (not black output).**
+  Variables (including intermediates) name *what they hold*, not their type: `median_life_exp`, not `vals`;
+  `order_by_2007`, not `o`; `gain_ax`/`pae_ax`, not `ax1`/`ax2`. Dataset bindings spell the dataset out
+  (`gapminder`, `penguins`, `flights`), never `gap`/`peng`/`fl`. Formatting follows black's *conventions* — no
+  semicolons or compound statements, one statement per line, trailing commas on multiline calls — but the cells
+  are deliberately **denser than strict black**: many-kwarg matplotlib calls are grouped a few args per
+  continuation line, where `black` would explode each to its own line (a 7-kwarg `ax.text` → 9 lines). That
+  density is intentional for worked examples, so **don't run `black` over the cells** — it would bloat them and
+  isn't wired up (these are `.qmd` cells, no `[tool.black]`). Treat "how would black format this?" as a
+  *tiebreaker* when a wrap is genuinely ambiguous, not a post-processor. (Extracted from a full-curriculum
+  refactor; honour it in every new cell.)
 
 ## Environment & commands
 
