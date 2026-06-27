@@ -61,6 +61,28 @@ GREY = "#9e9e9e"
 ACCENT = "#6400FF"
 ```
 
+```{python}
+#| label: data-helper
+from pathlib import Path
+import pandas as pd
+
+DATA = Path("../data")
+
+def load(name):
+    """Load a tidy dataset built by data/build_datasets.py.
+
+    The data is gitignored (regenerable), so a fresh clone has none yet. Fail with the
+    exact build command instead of a bare FileNotFoundError three frames deep.
+    """
+    path = DATA / f"{name}.csv"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} not found — the datasets are gitignored. Build them first:\n"
+            f"    uv run python data/build_datasets.py"
+        )
+    return pd.read_csv(path)
+```
+
 # M0 — Environment & the mental model
 
 **Principle.** Almost all "ugly default" pain is really *fighting the pyplot state machine* — the
@@ -218,6 +240,52 @@ for ax, scale in zip(axes, [1, 1000]):
             va="center", color=ACCENT, fontsize=9)
 ```
 
+## Before & after — the same series, raw vs. house
+
+Everything in M0 in one comparison, on real data: the classic airline-passengers series (1949–1960), drawn
+first with matplotlib's untouched defaults, then rebuilt on the OO API under `apply_theme`. The defaults and
+the house theme are *different rcParams*, so this has to be **two figures** — you can't put a truly raw axes
+beside a themed one in a single canvas, because the theme is global.
+
+```{python}
+#| label: m0-capstone-before
+#| fig-cap: "Before — matplotlib's untouched defaults: boxed in, primary blue, a title that just renames the y-axis."
+MONTHS = ["January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December"]
+mnum = {m: i + 1 for i, m in enumerate(MONTHS)}
+flights = load("flights")
+flights["date"] = flights.year + (flights.month.map(mnum) - 1) / 12
+flights = flights.sort_values("date")
+
+with plt.style.context("default"):          # the only honest way to show raw defaults post-apply_theme
+    fig, ax = plt.subplots()
+    ax.plot(flights.date, flights.passengers)
+    ax.set_title("Passengers")
+    ax.set_xlabel("date")
+    ylab = ax.set_ylabel("passengers")
+```
+
+```{python}
+#| label: m0-capstone-after
+#| fig-cap: "After — the OO API under apply_theme: grey for context, the accent on the trend, a takeaway title, trimmed spines."
+fig, ax = plt.subplots(constrained_layout=True)
+ax.plot(flights.date, flights.passengers, color=GREY, lw=1.1)                 # the monthly series = context
+
+trend = flights.passengers.rolling(12, center=True).mean()                   # the point: the trend
+ax.plot(flights.date, trend, color=ACCENT, lw=2.6)
+
+house_style.despine(ax)
+house_style.takeaway_title(ax, "US air travel roughly 6×'d in a decade — and the summer peaks grew with it")
+ax.set_xlabel("Year")
+trend_label = ax.annotate("12-month average", (flights.date.iloc[-30], trend.iloc[-30]),
+                          color=ACCENT, fontsize=9, xytext=(8, -2), textcoords="offset points")
+source = fig.text(0.0, -0.02, "Data: classic airline-passenger counts, monthly 1949–1960.",
+                  fontsize=8, color="#8a8a8a")
+```
+
+The data didn't change — the *decisions* did: trimmed spines, grey for context with the accent on the trend,
+and a title that says what happened instead of renaming the axis.
+
 ::: {.callout-important}
 ## Extract — M0 rules
 1. **Hold handles.** `fig, ax = plt.subplots(constrained_layout=True)`; never `plt.*` plotting afterward.
@@ -251,26 +319,7 @@ hardest lessons by doing each the wrong way first, on the project's real dataset
 
 ```{python}
 #| label: m1-data
-from pathlib import Path
-import pandas as pd
-
-DATA = Path("../data")
-
-def load(name):
-    """Load a tidy dataset built by data/build_datasets.py.
-
-    The data is gitignored (regenerable), so a fresh clone has none yet. Fail with the
-    exact build command instead of a bare FileNotFoundError three frames deep.
-    """
-    path = DATA / f"{name}.csv"
-    if not path.exists():
-        raise FileNotFoundError(
-            f"{path} not found — the datasets are gitignored. Build them first:\n"
-            f"    uv run python data/build_datasets.py"
-        )
-    return pd.read_csv(path)
-
-gap = load("gapminder")
+gap = load("gapminder")        # load() + pandas live in the data-helper cell up top
 dino = load("datasaurus")
 ```
 
@@ -404,6 +453,48 @@ source = fig.text(0.012, -0.02,
 
 Both panels show the same nine numbers. Only the bar lets you rank them at a glance — and the accent puts the
 two-country dominance where the eye lands first.
+
+## Before & after — a relationship needs a scatter, not a bar of means
+
+One more chart-choice, on the Palmer penguins. The question is *how do flipper length and body mass relate,
+and does it differ by species?* A bar of mean mass is a true fact that answers a different question; the
+scatter answers the one we asked — and the cluster structure falls out for free.
+
+```{python}
+#| label: m1-capstone
+#| fig-cap: "Same question — how do flipper length and mass relate? A bar of means can't answer it; a scatter can."
+peng = load("penguins").dropna(subset=["species", "flipper_length_mm", "body_mass_g"])
+species = ["Adelie", "Chinstrap", "Gentoo"]
+palette = {"Adelie": ACCENT, "Chinstrap": "#E8833A", "Gentoo": "#1AA7A0"}   # 3 real series → 3 colours
+
+fig, (bad, good) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True)
+
+# BEFORE — bar of mean mass: a true fact, but it answers the wrong question.
+means = peng.groupby("species")["body_mass_g"].mean().reindex(species)
+bad.bar(species, means.to_numpy(), color=GREY)
+bad.set_ylabel("Mean body mass (g)")
+bad.set_title("Bar of means — no relationship in sight", loc="left", fontsize=11)
+house_style.despine(bad); house_style.thousands(bad, "y")
+
+# AFTER — scatter by species: the relationship and the clusters both appear.
+for sp in species:
+    s = peng[peng.species == sp]
+    good.scatter(s.flipper_length_mm, s.body_mass_g, s=20, color=palette[sp],
+                 alpha=0.8, edgecolor="none", label=sp)
+good.set_xlabel("Flipper length (mm)")
+good.set_ylabel("Body mass (g)")
+good.set_title("Scatter by species — mass climbs with flipper length", loc="left", fontsize=11)
+house_style.despine(good); house_style.thousands(good, "y")
+good.legend(frameon=False, fontsize=8, loc="upper left")
+
+fig.suptitle("Match the chart to the question: a relationship wants a scatter, not a bar of means",
+             x=0.012, ha="left", fontsize=13, weight="medium")
+source = fig.text(0.012, -0.02, f"Data: Palmer penguins (n={len(peng)} after dropping incomplete rows).",
+                  fontsize=8, color="#8a8a8a")
+```
+
+The bar isn't *wrong* — it's answering a question nobody asked. Choosing the chart is choosing which question
+the reader gets to answer.
 
 ::: {.callout-important}
 ## Extract — M1 rules
