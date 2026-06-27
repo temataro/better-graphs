@@ -506,6 +506,139 @@ the reader gets to answer.
    can — so plot it first.
 :::
 
+# M2 — Layout & composition: the figure is the master coordinate
+
+A chart's real coordinate system isn't the data — it's the **figure**: its size in inches times its dpi.
+Every point, line width, and margin is measured against that. A 10-pt label is physically 10 pt whether the
+figure is 4 inches wide or 12, so it reads *large* on a small figure and *lost* on a big one. Composition
+therefore starts with one decision — **how big is this figure, and where will it live** — and everything else
+follows. `constrained_layout=True` then keeps panels, ticks, and titles from colliding without hand-tuning.
+
+## A dashboard with `subplot_mosaic`
+
+`subplot_mosaic` lays out named panels from an ASCII sketch — a main view plus context panels — and the real
+craft is sharing **one colour encoding** across them so the eye carries meaning from panel to panel.
+
+```{python}
+#| label: m2-mosaic
+#| fig-cap: "subplot_mosaic: a main view plus two context panels, with a single continent colour key shared across them."
+g07 = gap[gap.year == 2007]
+CONT_COLORS = {"Africa": "#6400FF", "Americas": "#E8833A", "Asia": "#1AA7A0",
+               "Europe": "#C44E9C", "Oceania": "#5A8F3C"}
+
+fig, axd = plt.subplot_mosaic("AB\nAC", figsize=(10, 5.4), constrained_layout=True,
+                              gridspec_kw={"width_ratios": [2, 1]})
+
+# A — the main view: wealth vs health, bubble area ∝ population, colour = continent.
+A = axd["A"]
+for cont, c in CONT_COLORS.items():
+    d = g07[g07.continent == cont]
+    A.scatter(d.gdpPercap, d.lifeExp, s=np.sqrt(d["pop"]) / 200, color=c,
+              alpha=0.75, edgecolor="white", linewidth=0.3, label=cont)
+A.set_xscale("log")
+A.set_xlabel("GDP per capita (log scale, $)")
+A.set_ylabel("Life expectancy (years)")
+A.set_title(r"Wealth vs. health, 2007 — bubble area $\propto$ population", loc="left", fontsize=11)
+house_style.despine(A)
+A.legend(frameon=False, fontsize=7, loc="lower right", ncol=2)
+
+# B — context: the distribution of the y variable.
+B = axd["B"]
+B.hist(g07.lifeExp, bins=12, color=GREY)
+B.set_title("Distribution", loc="left", fontsize=10)
+house_style.despine(B)
+
+# C — context: median by continent, the SAME colour key as A.
+C = axd["C"]
+medc = g07.groupby("continent").lifeExp.median().sort_values()
+C.barh(range(len(medc)), medc.to_numpy(), color=[CONT_COLORS[c] for c in medc.index])
+C.set_yticks(range(len(medc))); C.set_yticklabels(medc.index, fontsize=8)
+C.set_title("Median, by continent", loc="left", fontsize=10)
+house_style.despine(C)
+
+source = fig.text(0.0, -0.02, "Data: Gapminder, 2007.", fontsize=8, color="#8a8a8a")
+```
+
+## Magnify without losing the overview
+
+An **inset** keeps the full trace *and* a zoomed detail in one figure — pick the zoom window from the data,
+not by eye.
+
+```{python}
+#| label: m2-inset
+#| fig-cap: "An inset magnifies the passband peak of a measured S21 trace while the overview stays put."
+rf = load("rf_ring_slot")
+fig, ax = plt.subplots(figsize=(9, 4.4), constrained_layout=True)
+ax.plot(rf.freq_ghz, rf.s21_db, color=GREY, lw=1.4)
+
+i = rf.s21_db.idxmax()                      # zoom on the passband peak — computed, not eyeballed
+f0 = rf.freq_ghz[i]
+band = (rf.freq_ghz >= f0 - 3) & (rf.freq_ghz <= f0 + 3)
+
+axins = ax.inset_axes([0.57, 0.12, 0.39, 0.46])
+axins.plot(rf.freq_ghz[band], rf.s21_db[band], color=ACCENT, lw=1.8)
+axins.scatter([f0], [rf.s21_db[i]], color=ACCENT, zorder=3)
+axins.set_title(f"passband peak ≈ {f0:.0f} GHz", loc="left", fontsize=9, color=ACCENT)
+axins.tick_params(labelsize=7)
+ax.indicate_inset_zoom(axins, edgecolor="#999999")
+
+ax.set_xlabel("Frequency (GHz)")
+ax.set_ylabel(r"$S_{21}$ (dB)")
+ax.set_title(r"Ring-slot transmission $S_{21}$, 75–110 GHz", loc="left", fontsize=11)
+house_style.despine(ax)
+source = fig.text(0.0, -0.02, r"Data: scikit-rf measured ring-slot 2-port ($S_{21}$ magnitude).",
+                  fontsize=8, color="#8a8a8a")
+```
+
+## Before & after — spaghetti vs. small multiples
+
+The most common layout failure is forcing many series into one axes. Same data, two layouts:
+
+```{python}
+#| label: m2-capstone-before
+#| fig-cap: "Before — every country's trajectory in one axes. All the data is here; none of it is readable."
+fig, ax = plt.subplots(figsize=(7, 4.2), constrained_layout=True)
+for _, d in gap.groupby("country"):
+    ax.plot(d.year, d.lifeExp, color=GREY, lw=0.6, alpha=0.5)
+ax.set_xlabel("Year")
+ax.set_ylabel("Life expectancy (years)")
+ax.set_title("All countries, one axes — spaghetti", loc="left", fontsize=11)
+house_style.despine(ax)
+note = fig.text(0.0, -0.02, "Data: Gapminder, 1952–2007.", fontsize=8, color="#8a8a8a")
+```
+
+```{python}
+#| label: m2-capstone-after
+#| fig-cap: "After — one panel per continent, the continental median in accent, a shared y-axis. Every region is legible."
+continents = ["Africa", "Americas", "Asia", "Europe", "Oceania"]
+fig, axes = plt.subplots(1, 5, figsize=(12, 3.0), sharey=True, constrained_layout=True)
+for ax, cont in zip(axes, continents):
+    sub = gap[gap.continent == cont]
+    for _, d in sub.groupby("country"):
+        ax.plot(d.year, d.lifeExp, color="#dadada", lw=0.7)
+    med = sub.groupby("year").lifeExp.median()
+    ax.plot(med.index, med.to_numpy(), color=ACCENT, lw=2.4)
+    ax.set_title(cont, loc="left", fontsize=11)
+    ax.set_xticks([1952, 2007])
+    house_style.despine(ax)
+axes[0].set_ylabel("Life expectancy (years)")
+fig.suptitle("Small multiples — the median in accent, a shared y-axis: the comparison the spaghetti hid",
+             x=0.01, ha="left", fontsize=13, weight="medium")
+source = fig.text(0.0, -0.02,
+                  "Data: Gapminder, 1952–2007. One faint line per country; accent = continental median.",
+                  fontsize=8, color="#8a8a8a")
+```
+
+::: {.callout-important}
+## Extract — M2 rules
+1. **The figure is the master coordinate.** Choose figure size (inches) × dpi *first* — points are physical,
+   so a 10-pt label is larger on a small figure — then let `constrained_layout=True` manage spacing.
+2. **Compose, don't cram.** `subplot_mosaic` lays out a main view plus context panels; share one colour
+   encoding across them so meaning carries between panels.
+3. **Many series → small multiples**, never spaghetti: one panel per group, shared axes, the summary in accent.
+4. **Zoom with an inset** (`ax.inset_axes` + `ax.indicate_inset_zoom`) to keep overview and detail together.
+:::
+
 # Roadmap — the modules ahead {.unnumbered}
 
 M0 bought the mental model; M1 added the chart-choice reflex (and `VISUALIZATION_GUIDE.md`). The rest of the
@@ -514,12 +647,11 @@ course keeps turning taste into reusable rules; each module ends by distilling o
 
 | Module | Principle | You'll build |
 |---|---|---|
-| **M2 — Layout & composition** | figure size/DPI as the master coordinate | `subplot_mosaic`, small multiples, an inset zoom |
 | **M3 — Typography** | type is half of "professional" | a title that states the takeaway with colour-keyed series words |
 | **M4 — Colour** | perceptual uniformity; grey + one accent | the same chart in three palette *types*; a centred diverging heatmap |
 | **M5 — Polish** | Tufte's data-ink ratio | a reusable `polish(ax)` from an ordered spines/ticks/grid pass |
 | **M6 — House style** | one theme, reused | a real `.mplstyle` + `apply_theme()` with `executive`/`detailed` modes |
 | **M7 — Composition capstone** | executive vs. detailed, multi-dataset | one dataset → two figures, exported as vector + 2× PNG |
 
-*Next:* **M2 — Layout & composition**, where the figure's size and DPI become the master coordinate that
-every mark, label, and margin is measured against.
+*Next:* **M3 — Typography**, where the title stops repeating the y-axis and starts colour-keying the series
+words so the legend dissolves into the sentence.

@@ -63,6 +63,9 @@ Still planned but **not** present (per `PLAN.md`): `outputs/` and the chart buil
   Use a principled categorical/sequential palette when several series genuinely need distinguishing (never
   rainbow); don't force everything to monochrome. Thousands separators + unit-aware tick formatters always.
 - Colorbars sized to the axes: fraction=0.046, pad=0.04.
+- Size the figure first (it's the master coordinate); compose multi-panel with `subplot_mosaic` +
+  `constrained_layout`, sharing one colour encoding across panels. Many series → small multiples (one panel
+  per group, shared axes), never spaghetti. Zoom with an inset (`inset_axes` + `indicate_inset_zoom`).
 
 ### Libraries / stack
 matplotlib (OO API), numpy, pandas, pypalettes (palettes), highlight-text (titles).
