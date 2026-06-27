@@ -34,5 +34,5 @@ grid.linewidth: 0.8
 # legend
 legend.frameon: False
 
-# color cycle — leads with the house accent #6400FF; M4 designs the full palette.
-axes.prop_cycle: cycler('color', ['6400FF','ff7f0e','2ca02c','17becf','d62728','8c564b'])
+# color cycle = the house CATEGORICAL palette (house_style.py), accent #6400FF first.
+axes.prop_cycle: cycler('color', ['6400FF','1AA7A0','E8833A','C44E9C','5A8F3C','2D7DD2'])

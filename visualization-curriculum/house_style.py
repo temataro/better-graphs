@@ -1,12 +1,21 @@
 """House style: one import, consistent charts. Grow this as you work through the modules."""
 from pathlib import Path
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 from matplotlib import font_manager as fm
 from matplotlib.ticker import FuncFormatter
+from matplotlib.colors import TwoSlopeNorm
 
 STYLE = Path(__file__).with_name("minerva.mplstyle")
 FONTS_DIR = Path(__file__).with_name("fonts")
+
+# House palette (M4). The accent leads; grey carries context. CATEGORICAL also seeds
+# minerva.mplstyle's prop_cycle, so the default series colours match.
+ACCENT = "#6400FF"
+GREY = "#9e9e9e"
+CATEGORICAL = ["#6400FF", "#1AA7A0", "#E8833A", "#C44E9C", "#5A8F3C", "#2D7DD2"]
+SEQUENTIAL = "viridis"
 
 
 def _register_fonts() -> None:
@@ -53,6 +62,15 @@ def thousands(ax, axis="y"):
 def add_colorbar(fig, mappable, ax, **kw):
     """Colorbar pre-sized to the axes (the fraction/pad magic numbers)."""
     return fig.colorbar(mappable, ax=ax, fraction=0.046, pad=0.04, **kw)
+
+def diverging_norm(values, center=0.0):
+    """A symmetric TwoSlopeNorm centred at `center` — the honest norm for signed data.
+
+    Equal colour extent either side of the midpoint, so a diverging colormap can't
+    exaggerate one direction. Pair with a diverging cmap (e.g. 'RdBu_r').
+    """
+    span = max(abs(np.nanmin(values) - center), abs(np.nanmax(values) - center))
+    return TwoSlopeNorm(vmin=center - span, vcenter=center, vmax=center + span)
 
 def outlined_text(ax, x, y, s, fg="white", lw=3, **kw):
     """Label that stays legible over a busy background."""

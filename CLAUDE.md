@@ -12,7 +12,8 @@ make professional, Tufte-grade matplotlib figures with zero re-explanation. The 
 - **`VISUALIZATION_GUIDE.md`** — the chart-choice decision framework: the 10 rules, a pre-flight checklist, a
   *(data shape × task) → chart* lookup, and a chart catalog (when to use / when not / the anti-pattern).
 - **`visualization-curriculum/house_style.py`** — the one-line lever agents call: `apply_theme()`, `despine()`,
-  `thousands()`, `add_colorbar()`, `outlined_text()`, `takeaway_title()`, and (eventually) chart builders.
+  `thousands()`, `add_colorbar()`, `outlined_text()`, `takeaway_title(highlight=…)`, `diverging_norm()`, the
+  `CATEGORICAL`/`ACCENT`/`GREY` palette, and (eventually) chart builders.
 
 Charts are byproducts; when you build one, the goal is to **extract the reusable rule** back into these three
 files. `PLAN.md` is the full module-by-module roadmap (M0–M7); read it before substantive work — each module
@@ -22,8 +23,8 @@ future agents; `.ipynb` files are byproducts of that, not the working surface.
 
 ## Current state (most of `PLAN.md`'s layout does not exist yet)
 
-This repo is at **M1 stage** (M0 and M1 of the curriculum are written) with the environment set up and
-working. What exists:
+This repo is at **M4 stage** (M0–M4 of the curriculum are written, each ending with a before/after on real
+data) with the environment set up and working. What exists:
 
 - `pyproject.toml` + uv-managed `.venv/` + `uv.lock` — the plotting stack is installed; git is initialized
   on `main`.
@@ -32,7 +33,7 @@ working. What exists:
 - `visualization-curriculum/minerva.mplstyle` — base rcParams; the default font is **League Spartan**.
 - `visualization-curriculum/fonts/` — vendored League Spartan + Junction (The League of Movable Type, OFL).
   `house_style` registers them on import, so figures need no system font install.
-- `visualization-curriculum/better_graphs.qmd` — the curriculum source (Quarto → HTML); **M0–M1 written**.
+- `visualization-curriculum/better_graphs.qmd` — the curriculum source (Quarto → HTML); **M0–M4 written**.
   Its M1 cells read `data/*.csv`, so build the datasets before rendering.
 - `VISUALIZATION_GUIDE.md` — the chart-choice decision framework (written in M1; see above).
 - `data/` — `build_datasets.py` (downloads + synthesizes the datasets) and `data/README.md` (provenance);
@@ -60,7 +61,8 @@ Still planned but **not** present (per `PLAN.md`): `outputs/` and the chart buil
 
 ### Hard rules
 - No pie beyond ~5 slices. No dual-y-axis unless units truly differ (label + color both axes).
-- No rainbow/jet. Sequential → viridis family; diverging → centered TwoSlopeNorm.
+- No rainbow/jet. Match palette *type* to data: categorical → `house_style.CATEGORICAL` (accent-led);
+  sequential → viridis; diverging → `house_style.diverging_norm()` (symmetric, centred TwoSlopeNorm).
 - Grey-for-context + one accent (`#6400FF`) is the *default* for a single-message chart — not a mandate.
   Use a principled categorical/sequential palette when several series genuinely need distinguishing (never
   rainbow); don't force everything to monochrome. Thousands separators + unit-aware tick formatters always.

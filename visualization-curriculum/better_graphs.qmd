@@ -718,18 +718,127 @@ source = fig.text(0.0, -0.02, f"Data: Palmer penguins (Adelie n={ad.notna().sum(
    the top of it.
 :::
 
+# M4 — Colour: match the palette *type* to the data
+
+Colour has three jobs, one per kind of data, and the cardinal error is using the wrong **type**:
+
+- **Categorical** — distinct hues for *unordered* groups (`house_style.CATEGORICAL`, accent-led).
+- **Sequential** — one perceptually-uniform ramp for *ordered* magnitude (**viridis**, never jet/rainbow).
+- **Diverging** — two hues around a *meaningful midpoint* for *signed* data (`house_style.diverging_norm`,
+  a symmetric `TwoSlopeNorm` so neither side is exaggerated).
+
+## One chart, three palette types
+
+The same five bars, coloured three ways — each palette type answers a *different question* about the values.
+
+```{python}
+#| label: m4-three-types
+#| fig-cap: "One bar chart, three palette TYPES: naming the groups, encoding magnitude, or showing deviation."
+medc = gap[gap.year == 2007].groupby("continent").lifeExp.median().sort_values()
+labels, vals, yb = medc.index.to_list(), medc.to_numpy(), np.arange(len(medc))
+
+fig, axes = plt.subplots(1, 3, figsize=(12, 3.6), constrained_layout=True, sharey=True)
+
+edge = dict(edgecolor="#bbbbbb", linewidth=0.6)        # keeps near-white diverging bars visible
+
+# categorical — distinct hues just NAME the groups
+axes[0].barh(yb, vals, color=house_style.CATEGORICAL[:len(vals)], **edge)
+axes[0].set_title("Categorical — names the groups", loc="left", fontsize=11)
+
+# sequential — a perceptually-uniform ramp ties colour to magnitude
+seq = plt.Normalize(vals.min(), vals.max())
+axes[1].barh(yb, vals, color=plt.cm.viridis(seq(vals)), **edge)
+axes[1].set_title("Sequential — encodes magnitude", loc="left", fontsize=11)
+
+# diverging — two hues around the mean: above / below average
+dev = vals - vals.mean()
+div = house_style.diverging_norm(dev, 0)
+axes[2].barh(yb, vals, color=plt.cm.RdBu_r(div(dev)), **edge)
+axes[2].set_title("Diverging — deviation from the mean", loc="left", fontsize=11)
+
+for ax in axes:
+    ax.set_yticks(yb); ax.set_yticklabels(labels, fontsize=8)
+    house_style.despine(ax)
+fig.suptitle("Match the palette TYPE to the question — name, magnitude, or deviation",
+             x=0.01, ha="left", fontsize=13, weight="medium")
+source = fig.text(0.0, -0.03, "Data: Gapminder, 2007 (median life expectancy by continent).",
+                  fontsize=8, color="#8a8a8a")
+```
+
+## A centred diverging heatmap
+
+Signed data — here each month's deviation from *its own year's* average — wants a diverging map pinned at
+zero, so white means "average" and the two hues are honestly symmetric.
+
+```{python}
+#| label: m4-diverging
+#| fig-cap: "Each cell = a month's passengers minus that year's mean; RdBu_r on a symmetric, zero-centred norm."
+fl = load("flights")
+mat = fl.pivot(index="month", columns="year", values="passengers").reindex(MONTHS)
+anom = mat.sub(mat.mean(axis=0), axis=1)        # deviation from each year's mean → signed, centred at 0
+
+fig, ax = plt.subplots(figsize=(9, 4.6), constrained_layout=True)
+im = ax.imshow(anom.to_numpy(), aspect="auto", cmap="RdBu_r",
+               norm=house_style.diverging_norm(anom.to_numpy(), 0))
+ax.set_yticks(range(len(MONTHS))); ax.set_yticklabels([m[:3] for m in MONTHS], fontsize=8)
+ax.set_xticks(range(len(anom.columns))); ax.set_xticklabels(anom.columns, fontsize=8, rotation=45)
+ax.set_xlabel("Year")
+ax.grid(False)        # no gridlines bleeding over the heatmap cells
+house_style.takeaway_title(ax, "Air travel runs hot in summer, cold in winter — and the swing widens over the decade")
+cb = house_style.add_colorbar(fig, im, ax)
+cb.set_label("Passengers vs. that year's average")
+source = fig.text(0.0, -0.04, "Data: classic airline passengers, 1949–1960.", fontsize=8, color="#8a8a8a")
+```
+
+## Before & after — jet vs. viridis
+
+The most common colour crime: a rainbow ramp on sequential data. Same passenger matrix, two colormaps.
+
+```{python}
+#| label: m4-capstone
+#| fig-cap: "Sequential data wants a perceptually-uniform ramp: jet invents bands that aren't in the data; viridis doesn't."
+fig, (before, after) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True, sharey=True)
+M = mat.to_numpy()
+
+im0 = before.imshow(M, aspect="auto", cmap="jet")
+before.set_title("jet — false boundaries, not uniform", loc="left", fontsize=11)
+house_style.add_colorbar(fig, im0, before)
+
+im1 = after.imshow(M, aspect="auto", cmap="viridis")
+after.set_title("viridis — one honest, uniform ramp", loc="left", fontsize=11)
+house_style.add_colorbar(fig, im1, after)
+
+for ax in (before, after):
+    ax.set_yticks(range(len(MONTHS))); ax.set_yticklabels([m[:3] for m in MONTHS], fontsize=7)
+    ax.set_xticks([0, len(mat.columns) - 1])
+    ax.set_xticklabels([mat.columns.min(), mat.columns.max()], fontsize=8)
+    ax.set_xlabel("Year")
+    ax.grid(False)        # no gridlines bleeding over the heatmap cells
+fig.suptitle("Sequential data wants a perceptually-uniform ramp — viridis, not jet",
+             x=0.01, ha="left", fontsize=13, weight="medium")
+source = fig.text(0.0, -0.03, "Data: classic airline passengers, 1949–1960 (raw monthly counts).",
+                  fontsize=8, color="#8a8a8a")
+```
+
+::: {.callout-important}
+## Extract — M4 rules
+1. **Palette type follows the data:** categorical (`house_style.CATEGORICAL`) for groups, sequential
+   (**viridis**) for magnitude, diverging (`house_style.diverging_norm`, centred) for signed values.
+2. **Never rainbow/jet** for sequential data — it fabricates boundaries and isn't perceptually uniform.
+3. **Centre diverging maps at the meaningful midpoint**, symmetric, so neither direction is exaggerated.
+:::
+
 # Roadmap — the modules ahead {.unnumbered}
 
-M0 bought the mental model; M1 added the chart-choice reflex (and `VISUALIZATION_GUIDE.md`). The rest of the
-course keeps turning taste into reusable rules; each module ends by distilling one back into
-`house_style.py` / `VISUALIZATION_GUIDE.md`.
+M0–M4 are done: the mental model, the chart-choice reflex (`VISUALIZATION_GUIDE.md`), layout, typography, and
+colour — each ending with a before/after on real data and a rule distilled back into `house_style.py` /
+`CLAUDE.md` / `VISUALIZATION_GUIDE.md`. What remains:
 
 | Module | Principle | You'll build |
 |---|---|---|
-| **M4 — Colour** | perceptual uniformity; grey + one accent | the same chart in three palette *types*; a centred diverging heatmap |
 | **M5 — Polish** | Tufte's data-ink ratio | a reusable `polish(ax)` from an ordered spines/ticks/grid pass |
 | **M6 — House style** | one theme, reused | a real `.mplstyle` + `apply_theme()` with `executive`/`detailed` modes |
 | **M7 — Composition capstone** | executive vs. detailed, multi-dataset | one dataset → two figures, exported as vector + 2× PNG |
 
-*Next:* **M4 — Colour**, where palette *type* (categorical, sequential, diverging) is matched to the data, and
-the house palette gets designed around the accent.
+*Next:* **M5 — Polish**, where a single `polish(ax)` pass over spines, ticks, and grid distils the data-ink
+discipline into one reusable call.
