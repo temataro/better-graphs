@@ -51,7 +51,9 @@ Still planned but **not** present (per `PLAN.md`): `outputs/` and the chart buil
 2. `from house_style import apply_theme; apply_theme(mode=...)` as the first plotting line.
    - mode='executive' → slides / one-message charts;  mode='detailed' → appendices / multi-panel.
 3. OO API: `fig, ax = plt.subplots(constrained_layout=True)`. No `plt.*` plotting calls after (only savefig).
-4. TITLE states the takeaway, not the axis names. Use highlight_text to key series by color.
+4. TITLE states the takeaway, not the axis names. Colour-key the series words into it:
+   `takeaway_title(ax, msg, highlight=[{"color": c1}, ...])` (wraps highlight_text) — a coloured word in the
+   sentence beats a legend box.
 5. Polish: offset/trim spines; set tick locators + unit-aware formatters; grid discipline; direct labels.
 6. Export: vector (SVG or PDF) for print/slides AND PNG at dpi=200 for web; bbox_inches='tight'.
    Dense scatter/large N → rasterized=True with a high savefig dpi.

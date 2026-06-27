@@ -639,6 +639,85 @@ source = fig.text(0.0, -0.02,
 4. **Zoom with an inset** (`ax.inset_axes` + `ax.indicate_inset_zoom`) to keep overview and detail together.
 :::
 
+# M3 — Typography: the title carries the legend
+
+Type is half of what makes a chart read as *professional*, and most of that is decisions, not fonts. The
+single highest-leverage move: the **title states the takeaway**, and the series words inside it are
+**colour-keyed** to the data — so the legend dissolves into the sentence and the reader's eye never leaves the
+plot to decode a key. `house_style.takeaway_title(ax, message, highlight=[...])` does exactly this, wrapping
+`highlight_text` so `<bracketed>` words take the series colours.
+
+## The legend, dissolved into the sentence
+
+```{python}
+#| label: m3-keyed
+#| fig-cap: "Each country's name is coloured to its line — no legend box, no round-trip for the eye."
+pair = gap[gap.country.isin(["China", "Brazil"])]
+colors = {"China": ACCENT, "Brazil": "#1AA7A0"}
+
+fig, ax = plt.subplots(figsize=(8, 4.4), constrained_layout=True)
+for c, d in pair.groupby("country"):
+    ax.plot(d.year, d.lifeExp, color=colors[c], lw=2.6)
+house_style.despine(ax)
+ax.set_xlabel("Year")
+ax.set_ylabel("Life expectancy (years)")
+
+def lifeexp(country, year):
+    return pair[(pair.country == country) & (pair.year == year)].lifeExp.iloc[0]
+behind = lifeexp("Brazil", 1952) - lifeexp("China", 1952)          # compute the gap, don't guess it
+
+house_style.takeaway_title(
+    ax, f"<China> began {behind:.0f} years behind <Brazil> — and caught it by 2007",
+    highlight=[{"color": colors["China"], "weight": "bold"},
+               {"color": colors["Brazil"], "weight": "bold"}])
+source = fig.text(0.0, -0.02, "Data: Gapminder, 1952–2007.", fontsize=8, color="#8a8a8a")
+```
+
+## Before & after — a title that renames the axis vs. one that carries the point
+
+Same histogram, same colours, same font — only the *typographic decisions* change. The left panel spends a
+title renaming the x-axis and parks a legend in the corner; the right panel puts the message in the title and
+keys the species into the words.
+
+```{python}
+#| label: m3-capstone
+#| fig-cap: "Typography is decisions, not fonts: the takeaway title + colour-keyed words replace a redundant title and a legend box."
+ad = peng[peng.species == "Adelie"].body_mass_g
+ge = peng[peng.species == "Gentoo"].body_mass_g
+pct = round(100 * (ge.mean() / ad.mean() - 1))
+cA, cG = ACCENT, "#1AA7A0"
+
+fig, (before, after) = plt.subplots(1, 2, figsize=(11, 4.4), constrained_layout=True, sharey=True)
+for ax in (before, after):
+    ax.hist(ad, bins=14, color=cA, alpha=0.6, label="Adelie")
+    ax.hist(ge, bins=14, color=cG, alpha=0.6, label="Gentoo")
+    house_style.despine(ax)
+    house_style.thousands(ax, "x")
+    ax.set_xlabel("Body mass (g)")
+
+# BEFORE — typography doing no work: a title that renames the axis, a boxed legend in the corner.
+before.set_title("Body mass (g)")
+before.set_ylabel("Count")
+before.legend(loc="upper right", frameon=True, fontsize=9)
+
+# AFTER — the takeaway title carries the key; the legend is gone.
+house_style.takeaway_title(
+    after, f"<Gentoo> outweigh <Adelie> by about {pct}%",
+    highlight=[{"color": cG, "weight": "bold"}, {"color": cA, "weight": "bold"}])
+
+source = fig.text(0.0, -0.02, f"Data: Palmer penguins (Adelie n={ad.notna().sum()}, Gentoo n={ge.notna().sum()}).",
+                  fontsize=8, color="#8a8a8a")
+```
+
+::: {.callout-important}
+## Extract — M3 rules
+1. **The title states the takeaway**, never the axis name.
+2. **Colour-key the series words into the title** with `takeaway_title(ax, msg, highlight=[...])` — a coloured
+   word in the sentence beats a legend box every time.
+3. **Type is hierarchy.** One clear weight/size step from title → labels → annotations; let the message sit at
+   the top of it.
+:::
+
 # Roadmap — the modules ahead {.unnumbered}
 
 M0 bought the mental model; M1 added the chart-choice reflex (and `VISUALIZATION_GUIDE.md`). The rest of the
@@ -647,11 +726,10 @@ course keeps turning taste into reusable rules; each module ends by distilling o
 
 | Module | Principle | You'll build |
 |---|---|---|
-| **M3 — Typography** | type is half of "professional" | a title that states the takeaway with colour-keyed series words |
 | **M4 — Colour** | perceptual uniformity; grey + one accent | the same chart in three palette *types*; a centred diverging heatmap |
 | **M5 — Polish** | Tufte's data-ink ratio | a reusable `polish(ax)` from an ordered spines/ticks/grid pass |
 | **M6 — House style** | one theme, reused | a real `.mplstyle` + `apply_theme()` with `executive`/`detailed` modes |
 | **M7 — Composition capstone** | executive vs. detailed, multi-dataset | one dataset → two figures, exported as vector + 2× PNG |
 
-*Next:* **M3 — Typography**, where the title stops repeating the y-axis and starts colour-keying the series
-words so the legend dissolves into the sentence.
+*Next:* **M4 — Colour**, where palette *type* (categorical, sequential, diverging) is matched to the data, and
+the house palette gets designed around the accent.

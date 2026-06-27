@@ -58,9 +58,21 @@ def outlined_text(ax, x, y, s, fg="white", lw=3, **kw):
     """Label that stays legible over a busy background."""
     return ax.text(x, y, s, path_effects=[pe.Stroke(linewidth=lw, foreground=fg), pe.Normal()], **kw)
 
-def takeaway_title(ax, message, sub=None):
-    """Title = the message, not the variables. TODO: wire in highlight_text for colored series words."""
-    ax.set_title(message, loc="left", pad=12)
+def takeaway_title(ax, message, sub=None, highlight=None, y=1.06, fontsize=13):
+    """Title = the message, not the variables.
+
+    Pass ``highlight=[{"color": c1, ...}, {"color": c2, ...}]`` to colour-key the
+    ``<bracketed>`` words in ``message`` to their series (via highlight_text), so the
+    legend lives in the sentence. Without it, a plain left-aligned title. The default
+    (ax, message, sub) call is unchanged.
+    """
+    if highlight:
+        from highlight_text import ax_text
+        ax_text(0, y, message, ax=ax, highlight_textprops=highlight, va="bottom",
+                annotationbbox_kw={"xycoords": "axes fraction", "frameon": False},
+                fontsize=fontsize)
+    else:
+        ax.set_title(message, loc="left", pad=12)
     if sub:
         ax.text(0, 1.02, sub, transform=ax.transAxes, fontsize=10, color="#666666")
     return ax
