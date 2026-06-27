@@ -28,12 +28,17 @@ This repo is at **M0 stage** but the environment is set up and working. What exi
   on `main`.
 - `visualization-curriculum/house_style.py` — the theme/helpers module. `apply_theme()` loads
   `minerva.mplstyle` and is verified working (it previously pointed at a nonexistent `your_style.mplstyle`).
-- `visualization-curriculum/minerva.mplstyle` — the base rcParams style sheet.
+- `visualization-curriculum/minerva.mplstyle` — base rcParams; the default font is **League Spartan**.
+- `visualization-curriculum/fonts/` — vendored League Spartan + Junction (The League of Movable Type, OFL).
+  `house_style` registers them on import, so figures need no system font install.
 - `visualization-curriculum/better_graphs.qmd` — the curriculum source (Quarto → HTML), built module by module.
+- `data/` — `build_datasets.py` (downloads + synthesizes the datasets) and `data/README.md` (provenance);
+  these two are tracked. The data they produce (`data/raw/`, `data/*.csv`, `data/*.npz`) is gitignored and
+  regenerated on demand: `uv run python data/build_datasets.py`.
 - `PLAN.md`, `README.md`, `output.pdf` (a 9-page PDF reference, ~41 MB).
 
-Still planned but **not** present (per `PLAN.md`): `VISUALIZATION_GUIDE.md`, `data/`, `outputs/`, and the
-chart builders inside `house_style.py` (`bar()`, `line()`, `slope()`, `dumbbell()`, `dist()`, `heatmap()`).
+Still planned but **not** present (per `PLAN.md`): `VISUALIZATION_GUIDE.md`, `outputs/`, and the chart
+builders inside `house_style.py` (`bar()`, `line()`, `slope()`, `dumbbell()`, `dist()`, `heatmap()`).
 Don't assume these exist.
 
 ## Charting rules (the operating manual)
@@ -66,6 +71,7 @@ The env is uv-managed and git is initialized on `main`. There is no test/lint/CI
   needed to render Quarto). Add a dep with `uv add <pkg>`.
 - **Run in the env:** `uv run python ...` (e.g. `uv run python -c "import house_style"` from the
   `visualization-curriculum/` dir).
+- **Build datasets:** `uv run python data/build_datasets.py` (downloads via `curl` + synthesizes RF data).
 - **Render the curriculum:** `uv run quarto render visualization-curriculum/better_graphs.qmd`, or
   `uv run quarto preview visualization-curriculum/better_graphs.qmd` for live reload. Quarto uses the jupyter
   engine, so run it through `uv run` to pick up the venv kernel. Code cells `import house_style`, which

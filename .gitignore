@@ -15,5 +15,11 @@ _site/
 # Large reference PDF — kept on disk, not in history (regenerable/external)
 output.pdf
 
+# Datasets are regenerable via data/build_datasets.py, so keep them out of git.
+# The build script + data/README.md ARE tracked; the data they produce is not.
+data/raw/
+data/*.csv
+data/*.npz
+
 # OS
 .DS_Store
