@@ -30,8 +30,18 @@ jupyter: python3
 
 Most matplotlib output looks like matplotlib: boxed-in spines, a primary blue, a title that
 just repeats the y-axis label, and ticks at whatever round numbers the library guessed. Fixing
-that is **not a question of competence — it's a question of taste**, and taste can be written down
+that is **not a question of competence but of taste**, and taste can be written down
 as rules. This curriculum is the rulebook.
+
+::: {.callout-note}
+Note that although this 'blog's curriculum and content choice was entirely
+designed by myself as a way to teach AI agents, interns, or myself what kind of
+graphs look and feel right, almost all the actual code snippets and text here
+are a product of a very long conversation with one AI agent (as of June 2026,
+that is Claude Code running Opus 4.8. I would like to revisit this idea every
+so often when I feel a step function has been reached in the performance of
+agents to see what the new kids on the block can come up with!
+:::
 
 Edward Tufte's *The Visual Display of Quantitative Information* is the north star: maximize the
 share of ink that carries data, cut the rest, and never let the chart mislead. Each module states
