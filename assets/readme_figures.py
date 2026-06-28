@@ -1,4 +1,4 @@
-"""Render the README before/after showcase figures into assets/.
+"""Render the README before/after figures into assets/.
 
 Run from the repo root:
 
@@ -8,10 +8,12 @@ Needs the built datasets (``data/*.npz``). Build them first if missing:
 
     uv run python data/build_datasets.py
 
-Each showcase is a side-by-side *before | after* composite: every panel is
-rendered on its own (the "before" line panel in genuine matplotlib defaults, so
-the font/spine/colour change is honest), saved to a temp PNG, then laid out two
--up with a headline. The committed outputs are the ``showcase-*.png`` files.
+Every example is a true *before vs. after*: the **before** is plain matplotlib with
+zero style choices (rendered under ``plt.style.context("default")``, so the boxed
+spines, primary blue, DejaVu font, and bare titles are honest), and the **after** is
+the full house style. Each panel is saved once at high DPI as its own ``*-before.png``
+/ ``*-after.png`` — no re-compositing, so they stay crisp on a retina display. The
+README lays the pairs out side by side.
 """
 import os
 import sys
@@ -28,52 +30,146 @@ import house_style
 from house_style import ACCENT, GREY
 from ndata import load, group, pivot, MONTHS
 
-PANEL_DPI = 200
-COMPOSITE_DPI = 150
+DPI = 200
 
 
-def _panel(fig, name):
-    """Save one before/after panel to a temp PNG and return its path."""
-    path = HERE / name
-    fig.savefig(path, dpi=PANEL_DPI, bbox_inches="tight")
+def _save(fig, stem):
+    path = HERE / f"{stem}.png"
+    fig.savefig(path, dpi=DPI, bbox_inches="tight")
     plt.close(fig)
+    print(f"  wrote  {stem}.png")
     return path
 
 
-def _composite(panel_pngs, out_name, headline):
-    """Lay two rendered panels side by side under a single headline."""
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5.4))
-    for ax, panel_png in zip(axes, panel_pngs):
-        ax.imshow(plt.imread(panel_png))
-        ax.axis("off")
-    fig.suptitle(headline, x=0.01, ha="left", fontsize=15, weight="bold")
-    fig.subplots_adjust(wspace=0.03, top=0.92)
-    out_path = HERE / out_name
-    fig.savefig(out_path, dpi=COMPOSITE_DPI, bbox_inches="tight")
-    plt.close(fig)
-    for panel_png in panel_pngs:
-        panel_png.unlink()
-    print(f"  wrote  {out_name}")
-    return out_path
+# ============================================================ hero: the 4-panel RF DUT report
+def rf_before():
+    dut_report = load("rf_dut_report")
+    frequency_ghz = dut_report["freq_ghz"]
+    power_amp = load("rf_pa_efficiency")
+    input_drive_dbm = power_amp["pin_dbm"]
+
+    with plt.style.context("default"):
+        fig, axes = plt.subplots(2, 2, figsize=(11, 6.6))
+        axes[0, 0].plot(frequency_ghz, dut_report["gain_db"])
+        axes[0, 0].set_title("gain_db")
+        axes[0, 0].set_xlabel("freq_ghz")
+        axes[0, 1].plot(frequency_ghz, dut_report["noise_figure_db"])
+        axes[0, 1].set_title("noise_figure_db")
+        axes[0, 1].set_xlabel("freq_ghz")
+        axes[1, 0].plot(frequency_ghz, dut_report["return_loss_db"])
+        axes[1, 0].set_title("return_loss_db")
+        axes[1, 0].set_xlabel("freq_ghz")
+        compression = axes[1, 1]
+        compression.plot(input_drive_dbm, power_amp["gain_db"])
+        twin = compression.twinx()
+        twin.plot(input_drive_dbm, power_amp["pae_pct"])  # same default blue — indistinguishable
+        compression.set_title("gain_db & pae_pct vs pin_dbm")
+        compression.set_xlabel("pin_dbm")
+        fig.suptitle("rf_dut_report")
+        fig.tight_layout()
+        return _save(fig, "rf-before")
 
 
-# ---------------------------------------------------------------- story 1: defaults vs house
-def showcase_defaults():
+def rf_after():
+    house_style.apply_theme("detailed")
+    dut_report = load("rf_dut_report")
+    frequency_ghz = dut_report["freq_ghz"]
+    power_amp = load("rf_pa_efficiency")
+    input_drive_dbm = power_amp["pin_dbm"]
+    pa_gain_db = power_amp["gain_db"]
+    pae_pct = power_amp["pae_pct"]
+
+    GAIN_COLOR = ACCENT
+    PAE_COLOR = house_style.CATEGORICAL[1]  # teal — the second series' key
+
+    fig, panels = plt.subplot_mosaic("AB\nCD", figsize=(11, 6.6), constrained_layout=True)
+
+    gain_ax = panels["A"]
+    gain_ax.plot(frequency_ghz, dut_report["gain_db"], color=GAIN_COLOR, lw=2)
+    gain_ax.set_title("Gain", loc="left", fontsize=11)
+    gain_ax.set_ylabel("Gain (dB)")
+    house_style.despine(gain_ax)
+
+    noise_figure_ax = panels["B"]
+    noise_figure_ax.plot(frequency_ghz, dut_report["noise_figure_db"], color=GREY, lw=2)
+    noise_figure_ax.set_title("Noise figure", loc="left", fontsize=11)
+    noise_figure_ax.set_ylabel("NF (dB)")
+    house_style.despine(noise_figure_ax)
+
+    return_loss_ax = panels["C"]
+    return_loss_ax.plot(frequency_ghz, dut_report["return_loss_db"], color=GREY, lw=2)
+    return_loss_ax.axhline(-10, ls="--", lw=1, color=ACCENT)
+    return_loss_ax.annotate(
+        "-10 dB match limit",
+        xy=(frequency_ghz[-1], -10),
+        xytext=(0, 4),
+        textcoords="offset points",
+        ha="right",
+        fontsize=8,
+        color=ACCENT,
+    )
+    return_loss_ax.set_title("Return loss", loc="left", fontsize=11)
+    return_loss_ax.set_xlabel("Frequency (GHz)")
+    return_loss_ax.set_ylabel(r"$S_{11}$ (dB)")
+    house_style.despine(return_loss_ax)
+
+    compression_ax = panels["D"]
+    compression_ax.plot(input_drive_dbm, pa_gain_db, color=GAIN_COLOR, lw=2)
+    compression_ax.set_title("PA compression & efficiency", loc="left", fontsize=11)
+    compression_ax.set_xlabel("Input drive (dBm)")
+    compression_ax.set_ylabel("Gain (dB)", color=GAIN_COLOR)
+    compression_ax.tick_params(axis="y", colors=GAIN_COLOR)
+    compression_ax.spines["left"].set_color(GAIN_COLOR)
+    compression_ax.spines["top"].set_visible(False)
+
+    pae_ax = compression_ax.twinx()
+    pae_ax.plot(input_drive_dbm, pae_pct, color=PAE_COLOR, lw=2)
+    pae_ax.set_ylabel("PAE (%)", color=PAE_COLOR)
+    pae_ax.tick_params(axis="y", colors=PAE_COLOR)
+    pae_ax.spines["right"].set_color(PAE_COLOR)
+    pae_ax.spines["top"].set_visible(False)
+
+    small_signal_gain_db = pa_gain_db[:5].mean()
+    p1db_index = int(np.argmin(np.abs(pa_gain_db - (small_signal_gain_db - 1.0))))
+    compression_ax.scatter(
+        [input_drive_dbm[p1db_index]], [pa_gain_db[p1db_index]], color=GAIN_COLOR, zorder=5
+    )
+    compression_ax.annotate(
+        "P1dB",
+        xy=(input_drive_dbm[p1db_index], pa_gain_db[p1db_index]),
+        xytext=(6, -2),
+        textcoords="offset points",
+        fontsize=8,
+        color=GAIN_COLOR,
+    )
+
+    fig.suptitle(
+        "DUT report — four measurements, one consistent sheet",
+        x=0.01,
+        ha="left",
+        fontsize=14,
+        weight="medium",
+    )
+    return _save(fig, "rf-after")
+
+
+# ============================================================ a trend over time
+def line_pair():
     flights = load("flights")
     year, passengers_per_year = group(
         flights["year"], flights["passengers"].astype(float), np.nansum
     )
 
     with plt.style.context("default"):
-        fig, ax = plt.subplots(figsize=(6.2, 4.4))
+        fig, ax = plt.subplots(figsize=(6.6, 4.6))
         ax.plot(year, passengers_per_year, marker="o")
-        ax.set_title("Passengers")
+        ax.set_title("passengers")
         ax.set_xlabel("year")
         ax.set_ylabel("passengers")
-        before = _panel(fig, "_tmp_defaults_before.png")
+        _save(fig, "line-before")
 
     house_style.apply_theme("executive")
-    fig, ax = plt.subplots(figsize=(6.2, 4.4))
+    fig, ax = plt.subplots(figsize=(6.6, 4.6))
     ax.plot(year, passengers_per_year, color=ACCENT, lw=2.6)
     house_style.polish(ax, grid="y")
     house_style.thousands(ax, "y")
@@ -89,56 +185,67 @@ def showcase_defaults():
         weight="bold",
     )
     ax.set_title("Air travel ~doubled across the 1950s", loc="left", pad=10)
-    after = _panel(fig, "_tmp_defaults_after.png")
-
-    return _composite(
-        [before, after], "showcase-defaults.png", "Same numbers — defaults vs. the house style"
-    )
+    _save(fig, "line-after")
 
 
-# ---------------------------------------------------------------- story 2: jet vs viridis
-def _heatmap_panel(passenger_matrix, years, cmap, title, name):
-    house_style.apply_theme("detailed")
-    fig, ax = plt.subplots(figsize=(6.2, 4.4))
-    heatmap = ax.imshow(passenger_matrix, aspect="auto", cmap=cmap)
-    ax.set_yticks(range(12))
-    ax.set_yticklabels([month[:3] for month in MONTHS], fontsize=7)
-    ax.set_xticks(range(0, len(years), 2))
-    ax.set_xticklabels(years[::2], fontsize=8)
-    ax.set_title(title, loc="left")
-    ax.grid(False)
-    house_style.add_colorbar(fig, heatmap, ax)
-    return _panel(fig, name)
-
-
-def showcase_color():
+# ============================================================ a matrix / seasonality
+def heatmap_pair():
     flights = load("flights")
     years = np.unique(flights["year"])
     _, _, passenger_matrix = pivot(
         flights["month"], flights["year"], flights["passengers"], rows=MONTHS, cols=years
     )
-    jet_panel = _heatmap_panel(
-        passenger_matrix, years, "jet", "jet — invents bands the data doesn't have", "_tmp_color_jet.png"
-    )
-    viridis_panel = _heatmap_panel(
-        passenger_matrix, years, "viridis", "viridis — perceptually even", "_tmp_color_viridis.png"
-    )
-    return _composite(
-        [jet_panel, viridis_panel], "showcase-color.png", "A rainbow ramp lies; a perceptual ramp doesn't"
-    )
+
+    with plt.style.context("default"):
+        fig, ax = plt.subplots(figsize=(6.8, 4.8))
+        heatmap = ax.imshow(passenger_matrix, aspect="auto")
+        ax.set_title("passengers")
+        ax.set_xlabel("year index")
+        ax.set_ylabel("month index")
+        fig.colorbar(heatmap)
+        fig.tight_layout()
+        _save(fig, "heatmap-before")
+
+    house_style.apply_theme("detailed")
+    fig, ax = plt.subplots(figsize=(6.8, 4.8))
+    heatmap = ax.imshow(passenger_matrix, aspect="auto", cmap="viridis")
+    ax.set_yticks(range(12))
+    ax.set_yticklabels([month[:3] for month in MONTHS], fontsize=8)
+    ax.set_xticks(range(0, len(years), 2))
+    ax.set_xticklabels(years[::2], fontsize=8)
+    ax.set_xlabel("year")
+    ax.grid(False)
+    colorbar = house_style.add_colorbar(fig, heatmap, ax)
+    colorbar.set_label("passengers / month")
+    ax.set_title("Air travel peaks every summer — and the peaks keep growing", loc="left", pad=10)
+    _save(fig, "heatmap-after")
 
 
-# ---------------------------------------------------------------- story 3: chart choice
+# ============================================================ the right chart for a change
 def _life_expectancy(gapminder, country, year):
     is_row = (gapminder["country"] == country) & (gapminder["year"] == year)
     return float(gapminder["lifeExp"][is_row][0])
 
 
-def showcase_chart_choice():
+def chart_choice_pair():
     gapminder = load("gapminder")
     countries = np.array(["Nigeria", "Bangladesh", "India", "Indonesia", "Brazil", "China"])
     life_exp_1952 = np.array([_life_expectancy(gapminder, c, 1952) for c in countries])
     life_exp_2007 = np.array([_life_expectancy(gapminder, c, 2007) for c in countries])
+
+    with plt.style.context("default"):
+        column = np.arange(len(countries))
+        bar_width = 0.4
+        fig, ax = plt.subplots(figsize=(6.8, 4.8))
+        ax.bar(column - bar_width / 2, life_exp_1952, width=bar_width, label="1952")
+        ax.bar(column + bar_width / 2, life_exp_2007, width=bar_width, label="2007")
+        ax.set_xticks(column)
+        ax.set_xticklabels(countries, rotation=30, ha="right")
+        ax.set_ylabel("lifeExp")
+        ax.set_title("lifeExp by country")
+        ax.legend()
+        fig.tight_layout()
+        _save(fig, "chartchoice-before")
 
     order_by_2007 = np.argsort(life_exp_2007)
     countries = countries[order_by_2007]
@@ -147,40 +254,25 @@ def showcase_chart_choice():
     row = np.arange(len(countries))
 
     house_style.apply_theme("detailed")
-    bar_height = 0.38
-    fig, ax = plt.subplots(figsize=(6.4, 4.4))
-    ax.barh(row - bar_height / 2, life_exp_1952, height=bar_height, color=GREY, label="1952")
-    ax.barh(row + bar_height / 2, life_exp_2007, height=bar_height, color=ACCENT, label="2007")
-    ax.set_yticks(row)
-    ax.set_yticklabels(countries, fontsize=9)
-    ax.set_xlabel("life expectancy (years)")
-    ax.set_title("Grouped bars — you subtract to compare", loc="left")
-    ax.legend(loc="lower right", fontsize=8)
-    house_style.polish(ax, grid="x")
-    grouped = _panel(fig, "_tmp_choice_grouped.png")
-
-    house_style.apply_theme("detailed")
-    fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    fig, ax = plt.subplots(figsize=(6.8, 4.8))
     for row_y, start, end in zip(row, life_exp_1952, life_exp_2007):
         ax.plot([start, end], [row_y, row_y], color="#cfcfcf", lw=2.5, zorder=1)
-    ax.scatter(life_exp_1952, row, color=GREY, s=45, zorder=2, label="1952")
-    ax.scatter(life_exp_2007, row, color=ACCENT, s=60, zorder=3, label="2007")
+    ax.scatter(life_exp_1952, row, color=GREY, s=55, zorder=2, label="1952")
+    ax.scatter(life_exp_2007, row, color=ACCENT, s=70, zorder=3, label="2007")
     ax.set_yticks(row)
-    ax.set_yticklabels(countries, fontsize=9)
+    ax.set_yticklabels(countries, fontsize=10)
     ax.set_xlabel("life expectancy (years)")
-    ax.set_title("Dumbbell — the gain is the line", loc="left")
-    ax.legend(loc="lower right", fontsize=8)
+    ax.legend(loc="lower right", fontsize=9)
     house_style.polish(ax, grid="x")
-    dumbbell = _panel(fig, "_tmp_choice_dumbbell.png")
-
-    return _composite(
-        [grouped, dumbbell], "showcase-chartchoice.png", "Same data — the right chart shows the change"
-    )
+    ax.set_title(r"Life expectancy, 1952 $\rightarrow$ 2007 — the line is the gain", loc="left", pad=10)
+    _save(fig, "chartchoice-after")
 
 
 if __name__ == "__main__":
-    print("Rendering README showcase figures ->", HERE)
-    showcase_defaults()
-    showcase_color()
-    showcase_chart_choice()
+    print("Rendering README before/after figures ->", HERE)
+    rf_before()
+    rf_after()
+    line_pair()
+    heatmap_pair()
+    chart_choice_pair()
     print("done.")
