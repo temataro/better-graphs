@@ -9,7 +9,7 @@ but of taste! Edward Tufte's [The Visual Display of Quantitative Information](ht
 is our North star and the benchmark we're going to set for ourselves as
 professional graph makers & communicators of scientific data!
 
-📖 **Read it online (the live "blog"):** <https://temataro.github.io/better-work-graphs/>
+📖 **Read it online (the live "blog"):** <https://temataro.github.io/better-graphs/>
 
 ---
 
