@@ -1,0 +1,812 @@
+---
+title: "Style & Substance"
+subtitle: "The fable design system — a figure is a small publication"
+author: "github.com/temataro"
+AI Assistance: "Claude Fable 5"
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-title: "Chapters"
+    number-sections: true
+    number-depth: 2
+    code-tools: true
+    code-fold: false
+    code-overflow: wrap
+    fig-align: center
+    fig-format: png
+    theme: cosmo
+    output-file: style_and_substance.html
+    embed-resources: true
+execute:
+  warning: false
+  echo: true
+jupyter: python3
+---
+
+## Preface — the second draft {.unnumbered}
+
+The original curriculum (`better_graphs.qmd`, M0–M7) taught the craft: hold object handles,
+choose the chart before you code, polish away the "default matplotlib" tell. This document is
+its second draft, written green-field by a different author with the same convictions and a
+sharper claim:
+
+> **A figure is a small publication.** It has a headline, a standfirst (the *dek*), a body,
+> and a source line. It is edited for a specific reader with a specific attention budget.
+> Everything on it is either evidence or is cut.
+
+Three questions, asked in order, decide every figure — the full argument lives in
+[`STYLE_AND_SUBSTANCE.md`](../STYLE_AND_SUBSTANCE.md):
+
+1. **What am I saying?** One sentence, before any code. `VISUALIZATION_GUIDE.md` turns it
+   into a chart choice.
+2. **Who is reading?** The **register** — `glance` (3 seconds, across a room), `read`
+   (30 seconds, arm's length), `study` (minutes, leaning in).
+3. **How hard should I try?** The **altitude** — A0 themed default, A1 composed chart,
+   A2 bespoke drawing with raw Artists. Effort is a budget; most figures live at A1.
+
+::: {.callout-note}
+This chapter of the project was designed and written by **Claude Fable 5** (Anthropic), asked
+to reimagine the repo's house style from scratch — research, palette mathematics, module,
+prose, and figures — under the owner's direction. The system it built is named after its
+author: *fable*. The original M0–M7 curriculum by Claude Opus 4.8 remains the craft course;
+nothing here replaces it, everything here argues with it a little.
+:::
+
+```{python}
+#| label: setup
+# The page anatomy uses inch-true margins, so the notebook renderer must not
+# tight-crop them away.
+%config InlineBackend.print_figure_kwargs = {'bbox_inches': None}
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+import fable
+from ndata import load, select, group, pivot, MONTHS
+
+fable.theme("read")   # question 2 gets answered before the first mark is drawn
+```
+
+# The thesis — decluttered is only half the work
+
+**Principle.** Tufte's data-ink razor is a *precondition*, not the payoff. In the controlled
+experiments of Ajani, Xiong, Knaflic & Franconeri, decluttered charts scored no better than
+cluttered ones on ten-second recall. The winners were ***focused*** charts: decluttered,
+**plus** one accented series, **plus** a plain-language annotation stating the conclusion.
+Cleaning tells the reader you're serious; the accent and the sentence tell them what you found.
+
+Three renderings of the same twelve numbers — yearly passengers on international airlines.
+
+## Cluttered — the raw default
+
+```{python}
+#| label: thesis-cluttered
+#| fig-cap: "The raw default: boxed in, primary blue, a title that renames the y-axis, no finding in sight."
+flights = load("flights")
+year, passengers_per_year = group(flights["year"], flights["passengers"].astype(float), np.nansum)
+
+# style.use, not style.context: generic font families resolve at DRAW time, which
+# happens after a context manager exits — a context here would render this
+# "default" figure in the fable fonts. (fable.theme() restores the system later.)
+plt.style.use("default")
+fig, ax = plt.subplots(figsize=(7.2, 4.2))
+ax.plot(year, passengers_per_year, marker="o")
+ax.set_title("passengers")
+ax.set_xlabel("year")
+ax.set_ylabel("passengers")
+ax.grid(True)
+```
+
+## Decluttered — necessary, not sufficient
+
+```{python}
+#| label: thesis-decluttered
+#| fig-cap: "Decluttered: spines trimmed, grid faded, junk gone — and still no finding. The reader does all the work."
+plt.style.use("default")
+fig, ax = plt.subplots(figsize=(7.2, 4.2))
+ax.plot(year, passengers_per_year, color="#666666", lw=2)
+for side in ("top", "right"):
+    ax.spines[side].set_visible(False)
+ax.grid(axis="y", color="#dddddd", lw=0.7)
+ax.set_title("Airline passengers per year", loc="left")
+```
+
+## Focused — the fable page
+
+```{python}
+#| label: thesis-focused
+#| fig-cap: "Focused: the same numbers as a publication — kicker, a title with a verb, units in the dek, an annotation that interprets, a source line."
+fable.theme("read")
+fig, ax = fable.page(
+    kicker="Air travel · 1949–1960",
+    title="The jet age took off before the jets did",
+    dek="Passengers on international airlines, millions per year. The Boeing 707's\n"
+        "1958 debut only steepened a climb already under way.",
+    source="Source: Box & Jenkins airline series, via seaborn-data",
+    note="better graphs · fable",
+)
+ax.plot(year, passengers_per_year / 1e3, color=fable.ACCENT, zorder=3)
+fable.gradient_fill(ax, year, passengers_per_year / 1e3, alpha_top=0.10)
+ax.set_ylim(0, 6)
+ax.margins(x=0.02)
+fable.finish(ax)
+fable.units(ax, "y", "count")
+passengers_1958_k = passengers_per_year[year == 1958][0] / 1e3
+fable.mark(ax, 1958, passengers_1958_k, "707 enters service",
+           dx=-64, dy=26, color=fable.INK)
+```
+
+The anatomy, top to bottom: the violet **tab** (the brand device — it never moves), a tracked
+**kicker** naming topic and period, a **title** that states the finding in League Spartan, a
+**dek** in Junction carrying what/units/method, the plot with y-labels sitting *on* their
+gridlines and a bottom rule that ends where the data ends, and a **source line** — because a
+figure that leaves the room must carry its provenance.
+
+## The first draft, for the record
+
+fable is a second draft, so the honest before/after is against the *original house style*,
+not just against raw matplotlib. Here is the same series drawn exactly as `main`'s
+`house_style` draws it (this is the README's `line-after.png`):
+
+```{python}
+#| label: thesis-house-style
+#| fig-cap: "The first draft — main's house style. Clean, accented, takeaway-titled… and still: no units, no source, no interpretation. A tidied chart, not yet a publication."
+import house_style
+
+house_style.apply_theme("executive")
+fig, ax = plt.subplots(figsize=(7.2, 4.5))
+ax.plot(year, passengers_per_year, color=house_style.ACCENT, lw=2.6)
+house_style.polish(ax, grid="y")
+house_style.thousands(ax, "y")
+ax.margins(x=0.10)
+ax.annotate(f"{passengers_per_year[-1]:,.0f}", (year[-1], passengers_per_year[-1]),
+            xytext=(8, 0), textcoords="offset points", va="center",
+            color=house_style.ACCENT, fontsize=11, weight="bold")
+ax.set_title("Air travel ~doubled across the 1950s", loc="left", pad=10)
+```
+
+Both drafts share the convictions — OO API, takeaway title, accent over grey, trimmed
+spines. What the second draft adds is exactly the publication layer: the **units** ("5,714"
+of *what*?), the **source line**, the **kicker** giving context, the **dek** doing the work a
+legend and a y-label used to fail at, and one **interpretive annotation**. Same taste,
+higher resolution.
+
+::: {.callout-important}
+## Extract — the thesis rules
+1. **Decluttering is a precondition; the accent + interpretive annotation are the payoff.**
+   A polished figure with no stated finding is unfinished.
+2. **The anatomy is the API:** `fable.page(kicker=, title=, dek=, source=)` — units in the
+   dek, never a rotated y-label; a title with a verb, never centred.
+3. `fable.save()` exports with the margins intact — never `bbox_inches="tight"` on a page.
+:::
+
+# The register — one dataset, three readers
+
+**Principle.** A slide seen for three seconds, a report read at arm's length, and an appendix
+studied by an expert are three different *contracts*. Same data, three figures —
+`fable.theme()` makes the contract explicit before the first mark is drawn.
+
+The finding, one sentence: **Gentoo penguins run about a kilogram heavier than Adélie and
+chinstrap.**
+
+## `glance` — three seconds, across a room
+
+```{python}
+#| label: register-glance
+#| fig-cap: "The glance register: one message, one accent, direct labels, aggressive rounding. Nothing to decode."
+fable.theme("glance")
+penguins = load("penguins")
+species_order = np.array(["Adelie", "Chinstrap", "Gentoo"])
+species_labels = ["Adélie", "Chinstrap", "Gentoo"]      # display names, one spelling everywhere
+mass_by_species = [penguins["body_mass_g"][penguins["species"] == s] / 1000
+                   for s in species_order]
+
+fig, ax = fable.page(
+    size=(9.0, 4.6),
+    kicker="Palmer penguins",
+    title="Gentoo run a kilogram heavier",
+    dek="Body mass by species, kg. Each dot is one bird.",
+    source="Source: Palmer Station LTER, via seaborn-data",
+    margin_left=1.0,      # room for the species labels
+)
+rng = np.random.default_rng(7)
+for row, (species, masses) in enumerate(zip(species_order, mass_by_species)):
+    is_gentoo = species == "Gentoo"
+    color = fable.ACCENT if is_gentoo else fable.CONTEXT
+    jitter = rng.normal(0, 0.06, masses.size)
+    ax.scatter(masses, row + jitter, s=26, color=color, alpha=0.45, lw=0)
+    ax.scatter([masses.mean()], [row], s=230, color=color, zorder=5,
+               edgecolor=fable.PAPER, lw=1.4)
+    ax.annotate(f"{masses.mean():.1f} kg", (masses.mean(), row),
+                xytext=(0, 16), textcoords="offset points", ha="center",
+                family=fable.DISPLAY_STACK, weight=600,
+                size=15 if is_gentoo else 12,
+                color=color if is_gentoo else fable.MUTED)
+ax.set_yticks(range(3))
+ax.set_yticklabels(species_labels, family=fable.BODY_STACK, size=12)
+ax.set_ylim(-0.6, 2.75)
+fable.finish(ax, grid=None)
+ax.set_xticks([3, 4, 5, 6])
+fable.units(ax, "x", "count")
+```
+
+## `read` — thirty seconds, arm's length
+
+```{python}
+#| label: register-read
+#| fig-cap: "The read register: the relationship behind the ranking, series colour-keyed into the dek — the legend, dissolved."
+fable.theme("read")
+flipper_mm = penguins["flipper_length_mm"]
+body_mass_kg = penguins["body_mass_g"] / 1000
+species = penguins["species"]
+
+fig, ax = fable.page(
+    kicker="Palmer penguins · 344 birds",
+    title="Bigger flippers, heavier birds — and Gentoo own the top-right",
+    dek="Body mass in kg against flipper length: <Gentoo> sit a kilogram\n"
+        "above <Adélie> and <Chinstrap> at every flipper size.",
+    dek_highlights=[{"color": fable.ACCENT, "weight": 700},
+                    {"color": fable.EMERALD, "weight": 700},
+                    {"color": fable.OCHRE, "weight": 700}],
+    source="Source: Palmer Station LTER, via seaborn-data",
+)
+species_colors = {"Gentoo": fable.ACCENT, "Adelie": fable.EMERALD, "Chinstrap": fable.OCHRE}
+for name, color in species_colors.items():
+    of_species = species == name
+    ax.scatter(flipper_mm[of_species], body_mass_kg[of_species],
+               s=26, color=color, alpha=0.55, lw=0)
+fable.finish(ax)
+fable.units(ax, "y", "count")
+# glyph fallback (the arrow) only engages when the font stack is explicit
+ax.set_xlabel("flipper length (mm) →", loc="right", family=fable.BODY_STACK)
+```
+
+## `study` — minutes, leaning in
+
+```{python}
+#| label: register-study
+#| fig-cap: "The study register: the full distributions, exact means, and n on the figure. Density is welcome; vagueness is not."
+fable.theme("study")
+fig, panels = fable.page(
+    size=(9.6, 4.4), mosaic="ACG",
+    kicker="Palmer penguins · body mass",
+    title="The Gentoo shift is the whole distribution, not a tail",
+    dek="Body mass distributions by species, kg. Bin width 250 g; dashed rule at each mean.",
+    source="Source: Palmer Station LTER, via seaborn-data · n = 342 after dropping 2 incomplete records",
+    wspace=0.12, gap_below_dek=0.30,
+)
+bins = np.arange(2.5, 6.75, 0.25)
+panel_names = {"Adelie": "A", "Chinstrap": "C", "Gentoo": "G"}
+for name, key in panel_names.items():
+    panel = panels[key]
+    masses = penguins["body_mass_g"][penguins["species"] == name] / 1000
+    is_gentoo = name == "Gentoo"
+    panel.hist(masses, bins=bins, color=fable.ACCENT if is_gentoo else fable.CONTEXT,
+               edgecolor=fable.PAPER, lw=0.6)
+    panel.axvline(masses.mean(), ls=(0, (4, 3)), lw=1.1, color=fable.INK)
+    panel.annotate(f"mean {masses.mean():.2f} kg\nn = {masses.size}",
+                   xy=(0.97, 0.93), xycoords="axes fraction", ha="right", va="top",
+                   family=fable.BODY_STACK, size=8.5, color=fable.MUTED)
+    fable.panel_title(panel, "Adélie" if name == "Adelie" else name)
+    panel.sharey(panels["A"])
+    fable.finish(panel, grid="y", nbins=4)
+for key in ("C", "G"):
+    panels[key].tick_params(labelleft=False)
+```
+
+::: {.callout-important}
+## Extract — the register rules
+1. **State the register before plotting**, right after the chart choice: *"`read`, because
+   this goes in the report body."* `fable.theme(register)` is the first plotting line.
+2. **One figure, one register.** Never reuse a slide figure in an appendix — re-render.
+3. The register caps everything: series count, tick budget, annotation budget, novelty.
+   The table lives in `STYLE_AND_SUBSTANCE.md`.
+:::
+
+# Colour — computed, not eyeballed
+
+**Principle.** A palette is a claim — *"these colours are distinguishable, by everyone, on
+this background"* — and the claim is checkable by simulation. Taste chooses the candidates;
+arithmetic gets a veto.
+
+## The receipts
+
+The palette that leads this system (violet · emerald · ochre · wine · navy · rust) was chosen
+by exactly that loop: hand-picked hue families, then `check_palette.py` simulating three kinds
+of dichromacy (Machado 2009) and measuring worst-pair ΔE, lightness band, chroma floor, and
+contrast against the paper. Run it — on the *old* house palette and on fable's:
+
+```{python}
+#| label: color-receipts
+from check_palette import check
+
+minerva_palette = ["#6400FF", "#1AA7A0", "#E8833A", "#C44E9C", "#5A8F3C", "#2D7DD2"]
+fable_palette = fable.SERIES
+
+for name, palette in [("minerva (main)", minerva_palette), ("fable", fable_palette)]:
+    report = check(palette, bg=fable.PAPER)
+    worst = {condition: result["min_delta_e"]
+             for condition, result in report["separation"].items()}
+    print(f"{name:15s} ok={report['ok']!s:5s} worst-pair deltaE by condition: {worst}")
+```
+
+The old palette's orange/green pair collapses to ΔE ≈ 7 under protanopia — indistinguishable
+for roughly one in twelve male readers, and invisible to anyone squinting at swatches. That is
+why **palette changes go through the validator**, and why the fable palette clears every
+condition with more than twice the ΔE ≥ 12 target.
+
+## Sequential — one hue, honestly spaced
+
+```{python}
+#| label: color-heatmap
+#| fig-cap: "The flights matrix on the house sequential ramp — Lab-arc-length equalised so equal steps read as equal change. The peak is labelled because the colorbar alone can't say '622'."
+fable.theme("read")
+years = np.unique(flights["year"])
+month_names, _, passenger_matrix = pivot(
+    flights["month"], flights["year"], flights["passengers"], rows=MONTHS, cols=years)
+
+fig, ax = fable.page(
+    size=(8.6, 5.2),
+    kicker="Air travel · monthly, 1949–1960",
+    title="Every summer peaks higher than the last",
+    dek="Passengers per month. The July 1960 peak is nearly six times January 1949.",
+    source="Source: Box & Jenkins airline series, via seaborn-data",
+    margin_right=0.9,
+)
+heat = ax.pcolormesh(years, np.arange(12), passenger_matrix,
+                     cmap=fable.SEQUENTIAL, rasterized=True)
+ax.invert_yaxis()
+ax.set_yticks(np.arange(12), [m[:3] for m in MONTHS], family=fable.BODY_STACK, size=8.5)
+ax.set_xticks(years[1::2])                       # 1950 … 1960: the peak column gets its year
+ax.grid(False)
+ax.tick_params(length=0)
+for spine in ax.spines.values():   # a hairline frame so the palest cells read as data
+    spine.set_visible(True)
+    spine.set_edgecolor(fable.HAIRLINE)
+    spine.set_linewidth(0.8)
+colorbar = fig.colorbar(heat, ax=ax, fraction=0.046, pad=0.03)
+colorbar.set_ticks([200, 400, 600], labels=["200", "400", "600k"])   # unit on the top tick
+colorbar.ax.tick_params(labelsize=8.5, length=0)
+colorbar.outline.set_visible(False)
+peak_month, peak_year = np.unravel_index(np.nanargmax(passenger_matrix), passenger_matrix.shape)
+peak_value = passenger_matrix[peak_month, peak_year]
+ax.annotate(f"{peak_value:,.0f}k", xy=(years[peak_year], peak_month),
+            ha="center", va="center", family=fable.BODY_STACK, weight=700,
+            size=9, color=fable.PAPER)
+```
+
+## Diverging — two hues around a meaningful zero
+
+```{python}
+#| label: color-diverging
+#| fig-cap: "Signed change wants a diverging encoding centred at zero: violet for gains, rust for losses, printed values on every bar."
+gapminder = load("gapminder")
+africa = select(gapminder, gapminder["continent"] == "Africa")
+countries_1987 = select(africa, africa["year"] == 1987)
+countries_2007 = select(africa, africa["year"] == 2007)
+assert (countries_1987["country"] == countries_2007["country"]).all()
+life_exp_change = countries_2007["lifeExp"] - countries_1987["lifeExp"]
+
+biggest_moves = np.argsort(life_exp_change)
+show = np.concatenate([biggest_moves[:6], biggest_moves[-6:]])
+show = show[np.argsort(life_exp_change[show])]
+change_shown = life_exp_change[show]
+names_shown = countries_1987["country"][show]
+
+fable.theme("read")
+fig, ax = fable.page(
+    size=(7.6, 5.4),
+    kicker="Gapminder · Africa, 1987–2007",
+    title="Twenty years that moved in both directions",
+    dek="Change in life expectancy at birth, years. The AIDS epidemic reversed decades\n"
+        "of gains in southern Africa while West Africa kept climbing.",
+    source="Source: Gapminder via Rdatasets · six biggest declines and six biggest gains shown",
+    margin_left=1.05,     # room for the country labels
+    margin_bottom=0.55,   # no x axis, so don't reserve tick space — keeps the footer anchored
+)
+bar_colors = [fable.BAD if change < 0 else fable.ACCENT for change in change_shown]
+rows = np.arange(len(show))
+ax.barh(rows, change_shown, height=0.62, color=bar_colors)
+ax.vlines(0, -0.5, len(show) - 0.5, color=fable.INK, lw=1.1)   # zero rule spans the bars, no more
+ax.set_ylim(-0.7, len(show) - 0.3)
+for row, change in zip(rows, change_shown):
+    inside = f"{change:+.1f}".replace("-", "−")   # a true minus, not a hyphen
+    ax.annotate(inside, (change, row), xytext=(5 if change > 0 else -5, 0),
+                textcoords="offset points", va="center",
+                ha="left" if change > 0 else "right",
+                family=fable.BODY_STACK, weight=700, size=8.5,
+                color=bar_colors[row])
+ax.set_yticks(rows, names_shown, family=fable.BODY_STACK, size=9)
+ax.tick_params(length=0)
+ax.grid(False)
+for side in ("bottom",):
+    ax.spines[side].set_visible(False)
+ax.set_xticks([])
+ax.margins(x=0.14)
+```
+
+::: {.callout-important}
+## Extract — the colour rules
+1. **Palettes are computed, not eyeballed** — `check_palette.py` before any palette ships;
+   simulate the rendered figure when lines are thin.
+2. **Fixed assignment, never cycled**: violet is always series 1; a 7th series is a design
+   failure. `GOOD`/`BAD` are reserved status colours.
+3. Sequential = one hue, perceptually spaced (`fable.SEQUENTIAL`, or viridis). Diverging =
+   two hues meeting at a light neutral, centred on the meaningful zero (`diverging_norm`).
+   Signed data on a sequential ramp is a lie of omission.
+:::
+
+# The altitude — how hard to try
+
+**Principle.** Craft is a budget. A0 (themed default) is for your own eyes; A1 (composed) is
+the default for anything shared; A2 (bespoke Artists) must pass a four-gate test: the message
+survives a standard form → the standard form buries it *or* the form carries meaning → the
+audience × lifetime pays for the craft → it stays honest. Most figures should fail gate 3.
+The same twelve years of seasonality, at all three altitudes:
+
+## A0 — the themed default (exploration only)
+
+```{python}
+#| label: altitude-a0
+#| fig-cap: "A0: twelve month-lines under the theme. Fine for a first look at your own screen; spaghetti for anyone else."
+fable.theme("read")
+fig, ax = fable.page(title="A0 — the exploratory look", tab=False)
+for month_index, month in enumerate(MONTHS):
+    ax.plot(years, passenger_matrix[month_index], lw=1.2)
+fable.finish(ax)
+```
+
+## A1 — the composed chart (the cycle plot)
+
+```{python}
+#| label: altitude-a1
+#| fig-cap: "A1: a cycle plot — one small panel per month, the right 'standard' chart almost nobody reaches for. Structure AND trend, no spaghetti."
+fable.theme("study")
+fig, panels = fable.page(
+    size=(9.8, 4.6), mosaic="ABCDEFGHIJKL",
+    kicker="Air travel · monthly, 1949–1960",
+    title="Summer grows fastest — the season is the story",
+    dek="Passengers per month, thousands; each panel runs 1949 to 1960, and the rule marks the month's mean.\n"
+        "July and August didn't just start higher — they grew faster than any other month.",
+    source="Source: Box & Jenkins airline series, via seaborn-data",
+    wspace=0.14, gap_below_dek=0.26,
+)
+summer = {"July", "August"}
+for month_index, (month, key) in enumerate(zip(MONTHS, "ABCDEFGHIJKL")):
+    panel = panels[key]
+    is_summer = month in summer
+    monthly = passenger_matrix[month_index]
+    panel.plot(years, monthly, lw=1.9 if is_summer else 1.2,
+               color=fable.ACCENT if is_summer else fable.CONTEXT)
+    panel.axhline(np.nanmean(monthly), lw=0.8, color=fable.MUTED, alpha=0.6)
+    panel.set_title(month[:3], family=fable.BODY_STACK, size=8.5, pad=4,
+                    color=fable.ACCENT if is_summer else fable.MUTED,
+                    weight=700 if is_summer else 500)
+    panel.sharey(panels["A"])
+    panel.set_xticks([])
+    panel.set_yticks([0, 200, 400, 600])
+    panel.grid(axis="y", color=fable.HAIRLINE, lw=0.5)   # anchors the shared y labels
+    panel.set_axisbelow(True)
+    for spine in panel.spines.values():
+        spine.set_visible(False)
+    panel.tick_params(length=0, labelleft=key == "A", labelsize=8)
+panels["A"].set_ylim(0, 700)
+```
+
+## A2 — the bespoke form (the seasonal spiral)
+
+Gate check, aloud: the finding survives a standard form (the cycle plot above) ✓; a linear
+axis *buries the cycle* — December and January are neighbours the line chart tears apart, and
+the form itself carries the meaning ✓; this is a poster/README hero, seen by many ✓; radius
+starts at zero and the values stay readable ✓. Passed — so we throw the axes away and draw.
+
+```{python}
+#| label: altitude-a2
+#| fig-cap: "A2: twelve years wound into a spiral — time as a helix, the season as an angle. The form IS the message; the how-to-read key is part of the figure."
+from matplotlib.collections import LineCollection
+
+fable.theme("glance")
+fig, ax = fable.page(
+    size=(8.6, 8.2),
+    kicker="Air travel · monthly, 1949–1960",
+    title="Twelve years of summers, wound tight",
+    dek="Each turn is one year, January at the top; distance from centre and colour\n"
+        "both encode passengers per month.",
+    source="Source: Box & Jenkins airline series, via seaborn-data",
+    tab=True,
+)
+passengers_flat = passenger_matrix.T.reshape(-1)          # year-major: Jan 1949 … Dec 1960
+month_in_series = np.arange(passengers_flat.size)
+angle = -2 * np.pi * (month_in_series % 12) / 12 + np.pi / 2   # Jan at 12 o'clock, clockwise
+radius = passengers_flat
+x = radius * np.cos(angle)
+y = radius * np.sin(angle)
+
+points = np.column_stack([x, y]).reshape(-1, 1, 2)
+segments = np.concatenate([points[:-1], points[1:]], axis=1)
+spiral = LineCollection(segments, cmap=fable.SEQUENTIAL, capstyle="round",
+                        array=passengers_flat[:-1], linewidths=2.4)
+ax.add_collection(spiral)
+
+# hand-drawn polar furniture: rings at 200/400/600k, spokes at each month
+import matplotlib.patheffects as pe
+
+ring_theta = np.linspace(0, 2 * np.pi, 240)
+for ring in (200, 400, 600):
+    ax.plot(ring * np.cos(ring_theta), ring * np.sin(ring_theta),
+            lw=0.7, color=fable.HAIRLINE, zorder=0)
+    ax.annotate(f"{ring}k", (0, ring), xytext=(0, 3), textcoords="offset points",
+                ha="center", family=fable.BODY_STACK, size=8, color=fable.FAINT,
+                path_effects=[pe.withStroke(linewidth=2.6, foreground=fable.PAPER)])
+for month_index, month in enumerate(MONTHS):
+    spoke = -2 * np.pi * month_index / 12 + np.pi / 2
+    ax.annotate(month[:3], (720 * np.cos(spoke), 720 * np.sin(spoke)),
+                ha="center", va="center", family=fable.BODY_STACK, size=9,
+                color=fable.MUTED)
+peak = int(np.argmax(passengers_flat))          # July 1960, the all-time high
+fable.mark(ax, x[peak], y[peak], f"Jul 1960 · {passengers_flat[peak]:,.0f}k",
+           dx=-96, dy=-34, color=fable.INK)
+ax.set_aspect("equal")
+ax.set_xlim(-800, 800)
+ax.set_ylim(-800, 800)
+ax.set_axis_off()
+```
+
+The honest verdict: for a `study` reader the **cycle plot wins** — it supports precise
+comparison, the spiral doesn't. The spiral earns its place only where a poster needs to *stop
+traffic* and the printed labels pay the debt. That's the altitude ladder working as intended:
+the test told us **when**, the Artists told us **how**.
+
+::: {.callout-important}
+## Extract — the altitude rules
+1. **A1 is the default for anything shared.** A0 never leaves your screen.
+2. **A2 requires the four-gate test, spoken aloud** — and gate 4 (honesty: zero-based radii,
+   printed values, a how-to-read key) is non-negotiable.
+3. Bespoke work is still made of the same Artists — `LineCollection`, hand-drawn rings,
+   `annotate` — under the same theme. Bespoke means *composed by hand*, not *lawless*.
+:::
+
+# Bespoke craft — drawing an instrument, not a chart
+
+**Principle.** Some data has a geometry of its own. An antenna pattern is not a time series —
+it is a *shape in space*, and the reader's question ("where does the energy go?") is angular.
+Default polar axes answer it with clutter; forty lines of Artists answer it like a datasheet
+figure should. This is the A2 chapter: every ring, spoke and label placed on purpose.
+
+```{python}
+#| label: bespoke-antenna
+#| fig-cap: "An 8-element array pattern drawn as an instrument: dB rings as depth, the main lobe accented, beamwidth measured on the figure, sidelobes labelled. No default polar furniture survives."
+antenna = load("rf_antenna_pattern")
+angle_deg = antenna["angle_deg"]
+gain_db = antenna["gain_db"]
+
+# measure first, so the title can state what the figure proves
+main_lobe = np.abs(angle_deg) <= 14.4                    # first nulls of the 8-element array
+above_half_power = (gain_db >= -3) & main_lobe
+half_power_angles = angle_deg[above_half_power]
+beamwidth = half_power_angles[-1] - half_power_angles[0]
+sidelobe_region = (angle_deg > 14.4) & (angle_deg < 30)
+sidelobe_index = np.flatnonzero(sidelobe_region)[np.argmax(gain_db[sidelobe_region])]
+sidelobe_db = gain_db[sidelobe_index]
+
+fable.theme("read")
+fig, ax = fable.page(
+    size=(9.2, 6.4),
+    kicker="8-element uniform linear array · half-wavelength spacing",
+    title=f"A {beamwidth:.1f}° beam, sidelobes {abs(sidelobe_db):.1f} dB down",
+    dek="Normalised gain vs. angle from broadside; radial depth in dB, floor at −40 dB.",
+    source="Source: synthesized ULA pattern (data/build_datasets.py)",
+)
+
+FLOOR_DB = -40.0
+def db_to_radius(db):
+    return (np.asarray(db) - FLOOR_DB) / -FLOOR_DB      # −40 dB → 0, 0 dB → 1
+
+theta = np.deg2rad(angle_deg)                            # 0° = broadside, straight up
+pattern_x = db_to_radius(gain_db) * np.sin(theta)
+pattern_y = db_to_radius(gain_db) * np.cos(theta)
+
+# furniture first: dB rings and angle spokes, drawn by hand so they stop mattering
+import matplotlib.patheffects as pe
+
+half_circle = np.linspace(-np.pi / 2, np.pi / 2, 181)
+for ring_db in (0, -10, -20, -30):
+    ring_r = db_to_radius(ring_db)
+    ax.plot(ring_r * np.sin(half_circle), ring_r * np.cos(half_circle),
+            lw=0.7, color=fable.HAIRLINE, zorder=0)
+    ax.annotate(f"{ring_db:g}".replace("-", "−") + (" dB" if ring_db == 0 else ""),
+                (-0.025, ring_r + 0.008), ha="right", family=fable.BODY_STACK,
+                size=8, color=fable.FAINT, zorder=7,   # knocks out even the lobe stroke
+                path_effects=[pe.withStroke(linewidth=3.4, foreground=fable.PAPER)])
+for spoke_deg in range(-90, 91, 30):
+    spoke = np.deg2rad(spoke_deg)
+    ax.plot([0, np.sin(spoke)], [0, np.cos(spoke)],
+            lw=0.7, color=fable.HAIRLINE, zorder=0)
+    ax.annotate((f"{spoke_deg:+d}°" if spoke_deg else "0°").replace("-", "−"),
+                (1.06 * np.sin(spoke), 1.06 * np.cos(spoke)),
+                ha="center", va="center", family=fable.BODY_STACK, size=9,
+                color=fable.MUTED)
+
+# the pattern: context in grey, the main lobe in violet
+main_lobe = np.abs(angle_deg) <= 14.4                    # first nulls of the 8-element array
+ax.plot(pattern_x, pattern_y, lw=1.6, color=fable.CONTEXT)
+ax.plot(pattern_x[main_lobe], pattern_y[main_lobe], lw=2.6, color=fable.ACCENT)
+ax.fill(np.append(pattern_x[main_lobe], 0), np.append(pattern_y[main_lobe], 0),
+        color=fable.ACCENT, alpha=0.08, lw=0)
+
+# the −3 dB beamwidth, measured on the figure (label inside the empty lobe)
+brace = np.deg2rad(np.linspace(half_power_angles[0], half_power_angles[-1], 60))
+brace_r = db_to_radius(-3)
+ax.plot(brace_r * np.sin(brace), brace_r * np.cos(brace), lw=1.4, color=fable.INK)
+ax.annotate(f"{beamwidth:.1f}°\nat −3 dB", (0, brace_r), xytext=(0, -13),
+            textcoords="offset points", ha="center", va="top",
+            family=fable.BODY_STACK, weight=700, size=9.5, color=fable.INK,
+            path_effects=[pe.withStroke(linewidth=2.6, foreground=fable.PAPER)])
+
+# first sidelobe, labelled with its level
+fable.mark(ax, pattern_x[sidelobe_index], pattern_y[sidelobe_index],
+           f"first sidelobe\n{sidelobe_db:.1f} dB".replace("-", "−"),
+           dx=26, dy=6, color=fable.MUTED)
+
+ax.set_aspect("equal")
+ax.set_xlim(-1.18, 1.18)
+ax.set_ylim(-0.06, 1.18)
+ax.set_axis_off()
+```
+
+Notice what carried over from A1 even with the axes gone: the page anatomy, the ink roles
+(hairline furniture, muted labels, one accent), printed values paying the debt of a
+non-standard form, and the annotation budget spent on *the two numbers an RF engineer would
+ask for first* — beamwidth and sidelobe level.
+
+::: {.callout-important}
+## Extract — the bespoke rules
+1. **Draw the furniture first, quietly** — rings and spokes in `HAIRLINE`/`FAINT` so the
+   data owns the contrast.
+2. **Measure on the figure**: the beamwidth brace and sidelobe label are computed from the
+   data in the cell, never transcribed constants.
+3. Domain geometry beats chart convention *when the reader's question is geometric* —
+   "where does the energy go" is an angle, so the figure is angular.
+:::
+
+# Capstone — the datasheet page
+
+**Principle.** Everything at once: a `study`-register page that reads like the first page of
+a component datasheet. Hero numbers answer the skim; four panels answer the read; spec bands
+and marks answer the engineer. One header, one source line, one system.
+
+```{python}
+#| label: capstone-datasheet
+#| fig-cap: "DUT-042, one page: stat row for the skim, measurement panels for the read, spec limits and P1dB marked for the engineer. The twin-axis temptation is answered with stacked shared-x panels."
+dut = load("rf_dut_report")
+frequency_ghz = dut["freq_ghz"]
+power_amp = load("rf_pa_efficiency")
+drive_dbm = power_amp["pin_dbm"]
+pa_gain_db = power_amp["gain_db"]
+pae_pct = power_amp["pae_pct"]
+
+# measure first — the title must say what the data says (the gain does fail at the edge)
+GAIN_SPEC_DB = 18.0
+spec_cross_ghz = frequency_ghz[dut["gain_db"] < GAIN_SPEC_DB][0]
+
+fable.theme("study")
+fig, panels = fable.page(
+    size=(10.2, 8.6),
+    mosaic="abcd\nGGRR\nNNPP\nNNEE",
+    kicker="DUT-042 · wideband LNA · rev B silicon",
+    title=f"Meets spec to {spec_cross_ghz:.1f} GHz — gain clips the 18 dB floor at the band edge",
+    dek="Measured at 25 °C, Vdd 3.3 V, 50 Ω. Shaded regions fail spec; the dashed rules are the limits.",
+    source="Source: synthesized DUT report + PA sweep (data/build_datasets.py)",
+    note="sheet 1 of 1 · fable",
+    height_ratios=[0.8, 2, 2, 2], hspace=0.5, wspace=0.42,
+)
+
+gain_db_meas = dut["gain_db"]
+noise_figure_db = dut["noise_figure_db"]
+return_loss_db = dut["return_loss_db"]
+small_signal_gain = pa_gain_db[:5].mean()
+p1db_index = int(np.argmin(np.abs(pa_gain_db - (small_signal_gain - 1))))
+
+fable.stat(panels["a"], f"{gain_db_meas.max():.1f} dB", "peak gain", "at 1.0 GHz")
+fable.stat(panels["b"], f"{noise_figure_db.min():.2f} dB", "best noise figure", "at 1.5 GHz")
+fable.stat(panels["c"], f"{drive_dbm[p1db_index]:.1f} dBm", "input P1dB", "PA sweep")
+fable.stat(panels["d"], f"{pae_pct.max():.0f}%", "peak PAE", "at full drive")
+
+gain_ax = panels["G"]
+gain_ax.plot(frequency_ghz, gain_db_meas, color=fable.ACCENT)
+gain_ax.set_ylim(15, 24)
+fable.panel_title(gain_ax, "Gain vs frequency")
+fable.finish(gain_ax)
+fable.spec_band(gain_ax, GAIN_SPEC_DB, side="below", label="18 dB min")
+fable.units(gain_ax, "y", "db")
+fable.units(gain_ax, "x", "ghz")
+fable.mark(gain_ax, spec_cross_ghz, GAIN_SPEC_DB,
+           f"under spec beyond {spec_cross_ghz:.2f} GHz",
+           dx=-88, dy=-26, color=fable.BAD, size=8)
+
+return_ax = panels["R"]
+return_ax.plot(frequency_ghz, return_loss_db, color=fable.NAVY)
+return_ax.set_ylim(-25, -8)
+fable.panel_title(return_ax, "Input return loss")
+fable.finish(return_ax)
+fable.spec_band(return_ax, -10, side="above", label="−10 dB max")
+fable.units(return_ax, "y", "db")
+fable.units(return_ax, "x", "ghz")
+
+noise_ax = panels["N"]
+noise_ax.plot(frequency_ghz, noise_figure_db, color=fable.EMERALD)
+noise_ax.set_ylim(1.0, 2.2)
+fable.panel_title(noise_ax, "Noise figure")
+fable.finish(noise_ax)
+fable.spec_band(noise_ax, 2.0, side="above", label="2.0 dB max")
+fable.units(noise_ax, "y", "db")
+fable.units(noise_ax, "x", "ghz")
+
+# The dual-axis temptation, resolved: gain and PAE share the drive axis,
+# not a scale — so they get stacked panels, x shared, one unit each.
+compression_ax = panels["P"]
+compression_ax.plot(drive_dbm, pa_gain_db, color=fable.ACCENT)
+compression_ax.scatter([drive_dbm[p1db_index]], [pa_gain_db[p1db_index]],
+                       s=30, color=fable.INK, zorder=5)
+compression_ax.annotate("P1dB", (drive_dbm[p1db_index], pa_gain_db[p1db_index]),
+                        xytext=(8, 4), textcoords="offset points",
+                        family=fable.BODY_STACK, weight=700, size=8.5, color=fable.INK)
+compression_ax.set_ylim(11, 16)
+fable.panel_title(compression_ax, "PA gain compression")
+fable.finish(compression_ax, nbins=4)
+fable.units(compression_ax, "y", "db")
+fable.units(compression_ax, "x", "dbm")   # its own scale — a borrowed axis doesn't read
+
+efficiency_ax = panels["E"]
+efficiency_ax.sharex(compression_ax)
+efficiency_ax.plot(drive_dbm, pae_pct, color=fable.OCHRE)
+# solid, labelled: dashed strokes are reserved for spec limits on this sheet
+efficiency_ax.axvline(drive_dbm[p1db_index], lw=0.9, color=fable.FAINT, zorder=0)
+efficiency_ax.annotate("P1dB", (drive_dbm[p1db_index], 57), xytext=(4, 0),
+                       textcoords="offset points", family=fable.BODY_STACK,
+                       size=8, color=fable.MUTED)
+efficiency_ax.set_ylim(0, 60)
+fable.panel_title(efficiency_ax, "Power-added efficiency")
+fable.finish(efficiency_ax, nbins=4)
+fable.units(efficiency_ax, "y", "pct")
+fable.units(efficiency_ax, "x", "dbm")
+
+fable.save(fig, "dut042_datasheet")
+```
+
+The compression/efficiency pair is the deliberate lesson: the M7 capstone twinned them on one
+axes with colour-keyed spines — legal, but the reader still juggles two scales. Stacked
+shared-x panels give each quantity its own honest axis, and the faint P1dB rule ties the story
+together across both. When in doubt, **split, don't twin.**
+
+::: {.callout-important}
+## Extract — the capstone rules
+1. **The page scales up**: kicker/title/dek/source work unchanged for a 9-panel mosaic —
+   one header block, one source line, per-panel micro-titles.
+2. **Stat tiles answer the skim** before any axes are read — put the numbers a skimmer
+   needs in `fable.stat()` tiles, computed from the data.
+3. **Split, don't twin**: stacked shared-x panels with one unit each beat a dual-y axes;
+   a faint shared rule (P1dB) carries the correspondence.
+:::
+
+# The whole system, distilled {.unnumbered}
+
+| Chapter | Principle | The lever it left behind |
+|---|---|---|
+| **S1** | focused beats decluttered | `page(kicker, title, dek, source)` — the anatomy |
+| **S2** | one dataset, three readers | `theme("glance" / "read" / "study")` — the register |
+| **S3** | colour claims are computable | `check_palette.py` · `SERIES` · `SEQUENTIAL`/`DIVERGING` |
+| **S4** | craft is a budget | the altitude ladder + the four-gate A2 test |
+| **S5** | some data has its own geometry | furniture-first bespoke drawing, values printed |
+| **S6** | the page scales to a datasheet | `stat()` tiles · `spec_band()` · split-don't-twin |
+
+The three questions — *what am I saying, who is reading, how hard should I try* — plus the
+guide's chart choice cover every figure decision this repo knows how to make. The rules live
+in [`STYLE_AND_SUBSTANCE.md`](../STYLE_AND_SUBSTANCE.md); the lever is one import away:
+
+```python
+import fable
+fable.theme("read")
+```

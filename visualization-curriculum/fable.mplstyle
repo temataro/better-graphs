@@ -1,0 +1,66 @@
+# fable.mplstyle — base rcParams for the fable design system.
+# Warm paper, warm ink, hairline y-grid, no box. Registers (glance/read/study)
+# override sizes on top of this; see fable.py.
+
+# ---- canvas
+figure.figsize: 7.2, 4.5
+figure.dpi: 180
+figure.facecolor: FAF7F2
+savefig.dpi: 200
+savefig.bbox: standard
+savefig.facecolor: FAF7F2
+
+# ---- type (Junction carries the working text; League Spartan is applied by
+# fable's helpers for display text). Junction's regular face registers as
+# weight 500, so 500 is "normal" here.
+font.family: sans-serif
+font.sans-serif: Junction, DejaVu Sans, sans-serif
+font.weight: 500
+font.size: 10.0
+axes.titlesize: 12
+axes.titleweight: 700
+axes.titlecolor: 201D1A
+axes.labelsize: 9.5
+axes.labelweight: 500
+axes.labelcolor: 6B655D
+text.color: 201D1A
+
+# ---- axes: no box; the bottom rule is the only axis line
+axes.facecolor: FAF7F2
+axes.edgecolor: 8A847B
+axes.linewidth: 0.9
+axes.spines.top: False
+axes.spines.right: False
+axes.spines.left: False
+axes.axisbelow: True
+
+# ---- ticks: quiet, x only by default (fable.finish removes y tick marks)
+xtick.color: 6B655D
+ytick.color: 6B655D
+xtick.labelsize: 9
+ytick.labelsize: 9
+xtick.direction: out
+xtick.major.size: 3.5
+ytick.major.size: 0
+xtick.major.width: 0.9
+
+# ---- grid: hairlines on the value axis only
+axes.grid: True
+axes.grid.axis: y
+grid.color: E3DDD1
+grid.linewidth: 0.7
+
+# ---- lines & patches
+lines.linewidth: 2.2
+lines.solid_capstyle: round
+lines.solid_joinstyle: round
+patch.linewidth: 0
+
+# ---- legend (mostly replaced by direct labels; quiet when it appears)
+legend.frameon: False
+legend.fontsize: 9
+
+# ---- the fable categorical series (validated by check_palette.py on
+# paper #FAF7F2 and on white: min pairwise deltaE 26.6 across
+# protanopia/deuteranopia/tritanopia, contrast >= 3:1)
+axes.prop_cycle: cycler('color', ['6400FF', '0FA077', 'C67D10', '5C2340', '142A6E', '93330E'])

@@ -45,10 +45,14 @@ jobs:
       - name: Render the curriculum (jupyter engine via the uv venv)
         run: uv run quarto render visualization-curriculum/better_graphs.qmd
 
+      - name: Render Style & Substance (the fable design system)
+        run: uv run quarto render visualization-curriculum/style_and_substance.qmd
+
       - name: Assemble the site
         run: |
           mkdir -p _site
           cp visualization-curriculum/index.html _site/index.html
+          cp visualization-curriculum/style_and_substance.html _site/style_and_substance.html
           touch _site/.nojekyll   # tell Pages not to run Jekyll over the output
 
       - name: Upload Pages artifact

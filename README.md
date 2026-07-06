@@ -56,6 +56,49 @@ curriculum ends with one of these.
 </tr>
 </table>
 
+## The second draft — Style & Substance (fable)
+
+The house style above cleans a chart. The **fable** design system — a green-field
+reimagining written by Claude Fable 5 on this branch — goes one step further and treats a
+figure as a **small publication**: a kicker, a title with a verb, a dek carrying the units,
+the plot, and a source line, on warm paper with a CVD-validated palette. The old "after"
+becomes the new "before":
+
+<table>
+<tr><td align="center"><b>Before</b> — the original house style (M7 capstone)</td></tr>
+<tr><td><img src="assets/rf-after.png" width="100%"></td></tr>
+<tr><td align="center"><b>After</b> — the same report as a fable datasheet page</td></tr>
+<tr><td><img src="assets/fable-datasheet.png" width="100%"></td></tr>
+</table>
+
+<table>
+<tr>
+  <td align="center"><b>Before</b> · house style</td>
+  <td align="center"><b>After</b> · fable</td>
+</tr>
+<tr>
+  <td><img src="assets/line-after.png" width="100%"></td>
+  <td><img src="assets/fable-line.png" width="100%"></td>
+</tr>
+</table>
+
+Three questions decide every fable figure: **what am I saying** (chart choice), **who is
+reading** (a `glance` / `read` / `study` register), and **how hard should I try** (an
+altitude ladder that says when to abandon the chart catalog and draw with raw Artists).
+The system lives in three artifacts:
+
+- **[`STYLE_AND_SUBSTANCE.md`](STYLE_AND_SUBSTANCE.md)** — the design philosophy: the
+  registers, the four-gate bespoke test, the page anatomy, the colour system.
+- **[`visualization-curriculum/fable.py`](visualization-curriculum/fable.py)** — the
+  one-import lever: `theme()`, `page()`, `finish()`, `units()`, `mark()`, `label_end()`,
+  `spec_band()`, `stat()`, `save()`, plus validated palettes and house colormaps.
+- **[`visualization-curriculum/style_and_substance.qmd`](visualization-curriculum/style_and_substance.qmd)**
+  — the companion course: the anatomy, one dataset at three registers, colour receipts
+  (`check_palette.py` fails the old palette, passes the new), the altitude ladder ending
+  in a seasonal spiral, a bespoke antenna-pattern drawing, and the datasheet capstone.
+
+There's a drop-in skill too: `cp -r .claude/skills/fable-charts ~/.claude/skills/`.
+
 ## What this is, in plain terms
 
 A short **course** plus a **reusable style kit**. The rules live in plain files an AI
@@ -112,7 +155,9 @@ The plotting stack is uv-managed; the datasets are gitignored but regenerate on 
 uv sync                                              # plotting + jupyter stack
 uv run python data/build_datasets.py                 # download + synthesize data/*.npz
 uv run quarto preview visualization-curriculum/better_graphs.qmd   # live-reload course
+uv run quarto render visualization-curriculum/style_and_substance.qmd  # the fable course
 uv run python assets/readme_figures.py               # regenerate the before/afters above
+uv run python assets/fable_figures.py                # regenerate the fable heroes
 ```
 
 Pushing to `main` auto-publishes the site via
@@ -151,3 +196,8 @@ look like Python anymore.
 Built with **Claude Opus 4.8** as a pair author under human direction — drafting the curriculum,
 writing and refactoring `house_style.py` and the snippets, and rendering/verifying the figures.
 Editorial direction, data choices, and final review are the author's.
+
+The **fable** design system (`STYLE_AND_SUBSTANCE.md`, `fable.py`, `check_palette.py`,
+`style_and_substance.qmd`) is a green-field reimagining by **Claude Fable 5** — its research,
+palette mathematics, module design, prose, and figures — produced on request as a
+"show me your taste" exercise, under the same human editorial direction.

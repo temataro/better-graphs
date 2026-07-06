@@ -49,6 +49,31 @@ distilled back into the three durable artifacts. The environment is set up and w
 Still planned but **not** present (per `PLAN.md`): the chart builders inside `house_style.py`
 (`bar()`, `line()`, `slope()`, `dumbbell()`, `dist()`, `heatmap()`). Don't assume these exist.
 
+## The fable system (this branch's second draft)
+
+`dev/claude/fable/style-and-substance` carries a green-field reimagining of the house style —
+**fable** — that supersedes the workflow below *when a figure is drawn with it*. Its artifacts:
+
+- **`STYLE_AND_SUBSTANCE.md`** — the design system: a figure is a small publication; three
+  questions (what am I saying → chart choice via `VISUALIZATION_GUIDE.md`; who is reading →
+  the `glance`/`read`/`study` **register**; how hard should I try → the A0/A1/A2 **altitude**
+  ladder with a four-gate test for bespoke Artist work).
+- **`visualization-curriculum/fable.py`** — the lever: `fable.theme(register)` then
+  `fable.page(kicker=, title=, dek=, source=)` (editorial anatomy, inch-true margins),
+  `finish()`, `units()` (unit on the top tick), `mark()`, `label_end()`, `spec_band()`,
+  `stat()`, `save()` (never `bbox_inches="tight"` on a page). Palette: violet-led `SERIES`
+  on warm paper, plus `SEQUENTIAL`/`DIVERGING` house colormaps.
+- **`visualization-curriculum/check_palette.py`** — CVD + contrast validator; any palette
+  change must pass it (compute, don't eyeball).
+- **`visualization-curriculum/style_and_substance.qmd`** — the worked-example course
+  (renders to `style_and_substance.html`; CI publishes it beside the original).
+- `.claude/skills/fable-charts/` — the drop-in skill encoding all of the above.
+
+The original house style (below, `house_style.py`, `better_graphs.qmd`) remains intact and
+renderable; prefer **fable** for new figures on this branch. Gotcha worth knowing: glyphs
+Junction lacks (° Ω →) need `family=fable.BODY_STACK` passed explicitly — rcParams fallback
+resolves to a single font file and drops them.
+
 ## Charting rules (the operating manual)
 
 ### Workflow (every time, in order)
