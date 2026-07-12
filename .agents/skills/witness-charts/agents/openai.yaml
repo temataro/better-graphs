@@ -1,0 +1,4 @@
+interface:
+  display_name: "Witness Charts"
+  short_description: "Evidence-aware Matplotlib figures"
+  default_prompt: "Use $witness-charts to create an auditable, accessible Matplotlib figure from this data."

@@ -1,0 +1,65 @@
+# Witness base style — F2P2: IBM Plex on field/parchment.
+# Purpose and medium overrides live in witness.theme(); this file carries the
+# stable rendering grammar only.
+
+# canvas
+figure.figsize: 8.4, 5.2
+figure.dpi: 150
+figure.facecolor: FBF5E8
+savefig.facecolor: FBF5E8
+savefig.dpi: 200
+savefig.transparent: False
+
+# typography — the TTF files are registered by witness on import
+font.family: sans-serif
+font.sans-serif: IBM Plex Sans, DejaVu Sans, sans-serif
+font.monospace: IBM Plex Mono, DejaVu Sans Mono, monospace
+font.size: 10
+mathtext.fontset: stix
+text.color: 19231E
+axes.titlecolor: 19231E
+axes.labelcolor: 556258
+axes.labelsize: 9
+xtick.labelsize: 8.5
+ytick.labelsize: 8.5
+xtick.color: 556258
+ytick.color: 556258
+axes.unicode_minus: True
+
+# plotting field
+axes.facecolor: FBF5E8
+axes.edgecolor: DED8C8
+axes.linewidth: 0.8
+axes.spines.top: False
+axes.spines.right: False
+axes.spines.left: False
+axes.spines.bottom: True
+axes.axisbelow: True
+axes.grid: True
+axes.grid.axis: y
+grid.color: DED8C8
+grid.linewidth: 0.7
+grid.alpha: 1.0
+
+# ticks and labels
+xtick.direction: out
+ytick.direction: out
+xtick.major.size: 0
+ytick.major.size: 0
+xtick.major.pad: 5
+ytick.major.pad: 5
+
+# marks
+lines.linewidth: 2.0
+lines.markersize: 5.0
+patch.linewidth: 0.8
+scatter.edgecolors: FBF5E8
+legend.frameon: False
+
+# selected CVD-validated categorical order: evergreen / brick / violet
+axes.prop_cycle: cycler('color', ['006B5E', 'A33A2B', '67469B'])
+
+# accessible vector output: preserve text, then witness.save embeds WOFF2.
+svg.fonttype: none
+pdf.fonttype: 42
+ps.fonttype: 42

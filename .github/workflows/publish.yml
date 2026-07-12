@@ -42,13 +42,20 @@ jobs:
       - name: Build datasets (regenerate the gitignored data in CI)
         run: uv run python data/build_datasets.py
 
+      - name: Run Witness audits and export tests
+        run: uv run python -m unittest discover -s tests -v
+
       - name: Render the curriculum (jupyter engine via the uv venv)
         run: uv run quarto render visualization-curriculum/better_graphs.qmd
+
+      - name: Render Evidence by Design (the Witness system)
+        run: uv run quarto render visualization-curriculum/evidence_by_design.qmd
 
       - name: Assemble the site
         run: |
           mkdir -p _site
           cp visualization-curriculum/index.html _site/index.html
+          cp visualization-curriculum/evidence_by_design.html _site/evidence_by_design.html
           touch _site/.nojekyll   # tell Pages not to run Jekyll over the output
 
       - name: Upload Pages artifact

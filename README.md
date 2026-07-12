@@ -13,6 +13,44 @@ professional graph makers & communicators of scientific data!
 
 ---
 
+## Witness — Evidence by Design
+
+This branch adds a third, independent design system: **Witness**. Its premise is
+that a shared figure should be an argument a reader can interrogate—not merely a
+clean chart or a small publication.
+
+Every Witness figure carries a claim, comparator, evidence roles, uncertainty
+semantics, boundary, and provenance. Purpose (`decide`, `explain`, `inspect`) is
+separate from medium (`html`, `slide`, `print`). The plotting body remains ordinary
+Matplotlib and the transformations remain explicit NumPy.
+
+```python
+witness.theme(purpose="explain", medium="html")
+fig, ax = witness.frame(claim)
+line = ax.plot(x, y, color=witness.EVIDENCE)[0]
+witness.tag(line, role="observation", redundant="line + direct label")
+witness.finish(fig, ax)
+witness.save(fig, "finding", strict=True)
+```
+
+Strict export produces accessible, font-embedded SVG; self-contained HTML; PDF;
+PNG; and a JSON evidence receipt. It audits the colours actually rendered and then
+reopens the SVG to verify ARIA, semantic IDs, selectable text, embedded fonts, and
+self-containment. The selected F2P2 identity uses IBM Plex Serif / Sans / Mono on
+parchment, with an evergreen / brick / violet palette validated for contrast and
+colour-vision deficiencies.
+
+<img src="assets/witness-penguin-estimation.png" width="100%"
+     alt="Witness estimation figure showing all penguin body-mass observations and bootstrap differences in means, with the scientific boundary and method printed on the page.">
+
+- **Design system:** [`EVIDENCE_BY_DESIGN.md`](EVIDENCE_BY_DESIGN.md)
+- **Worked showcase:** [`evidence_by_design.qmd`](visualization-curriculum/evidence_by_design.qmd)
+- **Lever:** [`witness.py`](visualization-curriculum/witness.py)
+- **Drop-in skill:** [`.agents/skills/witness-charts`](.agents/skills/witness-charts/SKILL.md)
+- **Rendered page:** <https://temataro.github.io/better-graphs/evidence_by_design.html>
+
+---
+
 Same data, same library — the only difference is **taste**, written down so an agent
 applies it every time. Here's a real RF device report drawn the default matplotlib
 way, then with this repo's house style:
@@ -112,6 +150,7 @@ The plotting stack is uv-managed; the datasets are gitignored but regenerate on 
 uv sync                                              # plotting + jupyter stack
 uv run python data/build_datasets.py                 # download + synthesize data/*.npz
 uv run quarto preview visualization-curriculum/better_graphs.qmd   # live-reload course
+uv run quarto preview visualization-curriculum/evidence_by_design.qmd  # Witness showcase
 uv run python assets/readme_figures.py               # regenerate the before/afters above
 ```
 

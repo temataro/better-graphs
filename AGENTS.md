@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to any capable AI agents when working with code in this repository.
 
@@ -8,7 +8,7 @@ This is not a charts repo that happens to use agents — it is an **agent-instru
 produce charts**. The real deliverable is a reusable, self-contained instruction set so any future agent can
 make professional, Tufte-grade matplotlib figures with zero re-explanation. The three durable artifacts are:
 
-- **`CLAUDE.md`** (this file) — the agent operating rules: workflow + hard rules.
+- **`AGENTS.md`** (this file) — the agent operating rules: workflow + hard rules.
 - **`VISUALIZATION_GUIDE.md`** — the chart-choice decision framework: the 10 rules, a pre-flight checklist, a
   *(data shape × task) → chart* lookup, and a chart catalog (when to use / when not / the anti-pattern).
 - **`visualization-curriculum/house_style.py`** — the one-line lever agents call: `apply_theme()`, `despine()`,
@@ -49,55 +49,30 @@ distilled back into the three durable artifacts. The environment is set up and w
 Still planned but **not** present (per `PLAN.md`): the chart builders inside `house_style.py`
 (`bar()`, `line()`, `slope()`, `dumbbell()`, `dist()`, `heatmap()`). Don't assume these exist.
 
-## The Witness system (this branch's third draft)
+## The fable system (this branch's second draft)
 
-`sol-5.6/style-and-substance` carries an independent reimagining named **Witness**.
-For new shared figures on this branch, Witness supersedes the original workflow below;
-`VISUALIZATION_GUIDE.md` still decides the chart.
+`dev/Codex/fable/style-and-substance` carries a green-field reimagining of the house style —
+**fable** — that supersedes the workflow below *when a figure is drawn with it*. Its artifacts:
 
-Its thesis is: **a figure is an argument you can interrogate.** A shared figure exposes
-its claim, comparator, evidence roles, uncertainty semantics, boundary, and provenance.
-Purpose (`decide` / `explain` / `inspect`) is independent of medium (`html` / `slide` /
-`print`), so a slide is re-composed rather than resized from a report figure.
+- **`STYLE_AND_SUBSTANCE.md`** — the design system: a figure is a small publication; three
+  questions (what am I saying → chart choice via `VISUALIZATION_GUIDE.md`; who is reading →
+  the `glance`/`read`/`study` **register**; how hard should I try → the A0/A1/A2 **altitude**
+  ladder with a four-gate test for bespoke Artist work).
+- **`visualization-curriculum/fable.py`** — the lever: `fable.theme(register)` then
+  `fable.page(kicker=, title=, dek=, source=)` (editorial anatomy, inch-true margins),
+  `finish()`, `units()` (unit on the top tick), `mark()`, `label_end()`, `spec_band()`,
+  `stat()`, `save()` (never `bbox_inches="tight"` on a page). Palette: violet-led `SERIES`
+  on warm paper, plus `SEQUENTIAL`/`DIVERGING` house colormaps.
+- **`visualization-curriculum/check_palette.py`** — CVD + contrast validator; any palette
+  change must pass it (compute, don't eyeball).
+- **`visualization-curriculum/style_and_substance.qmd`** — the worked-example course
+  (renders to `style_and_substance.html`; CI publishes it beside the original).
+- `.Codex/skills/fable-charts/` — the drop-in skill encoding all of the above.
 
-Durable artifacts:
-
-- `EVIDENCE_BY_DESIGN.md` — the full epistemic and visual design system.
-- `visualization-curriculum/witness.py` — `Claim`, `theme`, `frame`, `tag`,
-  `interval`, `reference`, `bracket`, `margin_note`, `linked_detail`, `finish`,
-  `audit`, `save`, and `fingerprint`. Helpers return native Matplotlib objects.
-- `visualization-curriculum/witness_audit.py` — executable palette, contrast, CVD,
-  baseline, and contract gates.
-- `visualization-curriculum/witness_export.py` — accessible SVG/HTML post-processing.
-- `visualization-curriculum/evidence_by_design.qmd` — the worked comparison and
-  scientific/RF capstones.
-- `.agents/skills/witness-charts/` — the portable operating card.
-
-The selected identity is **F2P2**: IBM Plex Serif / Sans / Mono on parchment
-`#FBF5E8`, with evergreen `#006B5E`, brick `#A33A2B`, and violet `#67469B`.
-Official TTF and WOFF2 builds are vendored under `fonts/witness/`; SVG keeps text
-selectable and embeds the WOFF2 faces. Meaningful small text uses `MUTED`, never the
-low-contrast support grey.
-
-Minimal workflow:
-
-```python
-claim = witness.Claim(statement=..., measure=..., comparison=..., scope=...,
-                      source=..., method=..., uncertainty=..., caveat=..., alt=...)
-witness.theme(purpose="explain", medium="html")  # first plotting line
-fig, ax = witness.frame(claim)
-line = ax.plot(x, y, color=witness.EVIDENCE)[0]
-witness.tag(line, role="observation", redundant="line + direct label")
-witness.finish(fig, ax)
-witness.save(fig, "stem", strict=True)
-```
-
-Keep transformations explicit in NumPy. Never style a model as an observation;
-every interval states what it represents. `save(strict=True)` emits SVG, HTML, PDF,
-PNG, and a JSON receipt; it audits actual rendered colours, bar scales, purpose roles,
-and the post-processed SVG. `strict=False` requires `override_reason=` when errors
-remain. The linter checks structure, not analytical truth; resolve its review prompts
-yourself.
+The original house style (below, `house_style.py`, `better_graphs.qmd`) remains intact and
+renderable; prefer **fable** for new figures on this branch. Gotcha worth knowing: glyphs
+Junction lacks (° Ω →) need `family=fable.BODY_STACK` passed explicitly — rcParams fallback
+resolves to a single font file and drops them.
 
 ## Charting rules (the operating manual)
 
@@ -152,9 +127,7 @@ pandas** (see below); pandas is used only by `data/build_datasets.py` (one-time 
 
 ## Environment & commands
 
-The env is uv-managed. Unit tests cover Witness semantics, palette/accessibility
-audits, and SVG/HTML export; compatibility CI runs against Matplotlib 3.8 and
-3.11, while Pages CI renders both curricula.
+The env is uv-managed and git is initialized on `main`. There is no test/lint/CI yet.
 
 - **Sync / install deps:** `uv sync` — installs the plotting stack plus the `dev` group (jupyter + ipykernel,
   needed to render Quarto). Add a dep with `uv add <pkg>`.
@@ -166,5 +139,5 @@ audits, and SVG/HTML export; compatibility CI runs against Matplotlib 3.8 and
   `uv run quarto preview visualization-curriculum/better_graphs.qmd` for live reload. Quarto uses the jupyter
   engine, so run it through `uv run` to pick up the venv kernel. Code cells `import house_style`, which
   resolves because each cell's working directory is the `.qmd`'s own folder.
-- **Render Witness:** `uv run quarto render visualization-curriculum/evidence_by_design.qmd`.
-- **Run tests:** `uv run python -m unittest discover -s tests -v`.
+
+When you add tests/lint/CI, record the commands here.

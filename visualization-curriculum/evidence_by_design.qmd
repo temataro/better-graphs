@@ -1,0 +1,1432 @@
+---
+title: "Evidence by Design"
+subtitle: "The Witness system — a figure is an argument you can interrogate"
+author: "github.com/temataro"
+date: last-modified
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    toc-title: "Chapters"
+    number-sections: true
+    number-depth: 2
+    code-tools: true
+    code-fold: false
+    code-overflow: wrap
+    fig-align: center
+    fig-format: png
+    theme: cosmo
+    output-file: evidence_by_design.html
+    embed-resources: true
+execute:
+  warning: false
+  echo: true
+jupyter: python3
+---
+
+## Preface — the third draft {.unnumbered}
+
+The original Better Graphs curriculum taught the craft: hold Matplotlib object handles,
+choose the chart before drawing it, and replace anonymous defaults with deliberate visual
+hierarchy. Fable made the next move: **a figure is a small publication**, complete with a
+headline, standfirst, interpretation, and source.
+
+Witness begins somewhere else:
+
+> **A figure is an argument you can interrogate.**
+
+A chart is not trustworthy because it is sparse, polished, or beautiful. It becomes easier
+to trust when a reader can recover the path from observation to claim: what is being claimed,
+compared with what, from which evidence, with what uncertainty, inside which boundary, and
+from which source. Witness turns that evidence structure into native Matplotlib Artists,
+stable SVG groups, a deterministic audit, and a receipt that leaves with the export.
+
+This is still Matplotlib. NumPy remains the analysis surface. `Axes.plot`, `Axes.scatter`,
+`Axes.bar`, transforms, insets, and Artists still do the drawing. Witness is a thin semantic
+layer around them, not a plotting framework and not a data-manipulation abstraction.
+
+The selected visual identity is **IBM Plex Serif / Sans / Mono** on field parchment, with an
+evergreen · brick · violet categorical voice. Typography distinguishes claim, explanation,
+and numeric evidence; colour is always backed by position, marker, stroke, hatch, or text.
+
+```{python}
+#| label: setup
+# Witness pages use deliberate physical margins; do not let the inline backend
+# tight-crop the figure after its layout has been composed.
+%config InlineBackend.print_figure_kwargs = {'bbox_inches': None}
+
+from pathlib import Path
+import json
+import xml.etree.ElementTree as ET
+
+from IPython.display import SVG, display
+import matplotlib.pyplot as plt
+from matplotlib.artist import Artist
+from matplotlib.collections import LineCollection, PolyCollection
+from matplotlib.lines import Line2D
+from matplotlib.patches import ConnectionPatch
+from matplotlib.ticker import FixedLocator, FixedFormatter
+import numpy as np
+
+import fable
+import house_style
+import witness
+from witness_audit import AuditError
+from ndata import load
+
+OUTPUTS = Path("../outputs")
+OUTPUTS.mkdir(exist_ok=True)
+
+
+def lock_lineage_axes(ax):
+    """Freeze the analytical geometry shared by all four lineage figures."""
+    ax.set_xlim(1948.6, 1960.4)
+    ax.set_ylim(1.2, 6.05)
+    ax.xaxis.set_major_locator(FixedLocator([1949, 1954, 1960]))
+    ax.yaxis.set_major_locator(FixedLocator([2, 4, 6]))
+    ax.yaxis.set_major_formatter(FixedFormatter(["2", "4", "6m"]))
+    ax.margins(x=0)
+    return ax
+
+
+def label_lineage_endpoints(ax, years, passengers_m, color):
+    """Print the same two endpoint values on every lineage rendering."""
+    for year, passengers, alignment, offset in (
+        (years[0], passengers_m[0], "left", (4, 8)),
+        (years[-1], passengers_m[-1], "right", (-4, 8)),
+    ):
+        ax.annotate(
+            f"{passengers:.2f}m",
+            (year, passengers), xytext=offset, textcoords="offset points",
+            ha=alignment, va="bottom", color=color, weight="bold",
+        )
+    return ax
+
+
+def bootstrap_mean_difference(target, comparator, *, seed, resamples=10_000):
+    """Explicit independent-group percentile bootstrap, using only NumPy."""
+    rng = np.random.default_rng(seed)
+    target_means = target[
+        rng.integers(0, target.size, size=(resamples, target.size))
+    ].mean(axis=1)
+    comparator_means = comparator[
+        rng.integers(0, comparator.size, size=(resamples, comparator.size))
+    ].mean(axis=1)
+    differences = target_means - comparator_means
+    low, high = np.quantile(differences, [0.025, 0.975])
+    return target.mean() - comparator.mean(), low, high
+
+
+def true_minus(value, digits=2):
+    return f"{value:+.{digits}f}".replace("-", "−")
+```
+
+# The contract — polish is not evidence
+
+**Principle.** A polished figure can still leave its analytical contract implicit. Witness
+requires six recoverable parts:
+
+1. **Claim** — what does the figure say?
+2. **Comparator** — compared with what baseline, peer, model, or reference?
+3. **Evidence** — which marks are observations, estimates, models, or context?
+4. **Uncertainty** — what is sampled, modelled, measured, missing, or not applicable?
+5. **Boundary** — where does the statement stop holding?
+6. **Provenance** — which source and explicit transformation produced the visible values?
+
+The contract is small enough to read before the plotting code:
+
+```{python}
+#| label: contract-minimal-api
+minimal_claim = witness.Claim(
+    statement="A reported response ends above its starting value",
+    measure="reported response",
+    comparison="last observation versus first",
+    scope="five deterministic demonstration points",
+    source="inline NumPy demonstration",
+    method="identity transform",
+    uncertainty="No inferential interval is claimed",
+    caveat="Illustrative API example, not a substantive finding.",
+    alt="A green line rises from one to three over five ordered points.",
+)
+minimal_claim
+```
+
+The contract contains no data. It does not compute the finding. It makes the analysis that
+the caller already performed explicit enough to inspect and audit.
+
+::: {.callout-important}
+## Extract — the contract rules
+
+1. A shared figure carries a claim, comparator, scope, source, and equivalent text.
+2. An interval says which interval it is; “error bars” is not a definition.
+3. Causal language needs a causal design. Styling cannot upgrade evidence.
+4. The audit checks structure. A person still judges the analysis.
+:::
+
+# One series, four generations
+
+The controlled comparison uses one immutable set of annual totals. Later systems may add
+their native anatomy, but none receives an analytical advantage: the data, transformation,
+claim, dimensions, line geometry, limits, ticks, and endpoint values are frozen.
+
+```{python}
+#| label: lineage-data
+flights = load("flights")
+lineage_years = flights["years"]
+lineage_passengers_m = flights["matrix"].sum(axis=0) / 1_000
+lineage_multiple = lineage_passengers_m[-1] / lineage_passengers_m[0]
+lineage_changes_m = np.diff(lineage_passengers_m)
+
+assert lineage_passengers_m[0] == 1.520
+assert lineage_passengers_m[-1] == 5.714
+assert np.all(lineage_changes_m > 0)
+
+print(f"1949: {lineage_passengers_m[0]:.3f} million")
+print(f"1960: {lineage_passengers_m[-1]:.3f} million")
+print(f"1960 / 1949: {lineage_multiple:.4f}×")
+```
+
+::: {.callout-note}
+## What is controlled
+
+- Every stage uses the OO API and the same precomputed NumPy arrays.
+- Figure size is 7.2 × 4.5 inches; limits and tick locations are identical.
+- Every stage prints the same title and the same two endpoint values.
+- Each stage begins by resetting or applying its own theme, so styles cannot leak.
+- Native anatomy is allowed to differ: that is the capability being compared.
+- This is a lineage demonstration, not a blinded claim that one surface alone improves
+  comprehension.
+:::
+
+## Stage 1 — raw Matplotlib
+
+**Line chart because one temporal + one quantitative variable + show evolution against a
+1949 baseline.**
+
+```{python}
+#| label: lineage-raw
+#| fig-cap: "Stage 1 — correct marks under raw Matplotlib defaults. The claim is present, but its analytical contract lives outside the image."
+plt.style.use("default")
+fig, ax = plt.subplots(figsize=(7.2, 4.5), constrained_layout=True)
+ax.plot(lineage_years, lineage_passengers_m, color="#1F77B4", lw=2)
+lock_lineage_axes(ax)
+label_lineage_endpoints(ax, lineage_years, lineage_passengers_m, "#1F77B4")
+ax.set_title("Annual passenger total reached 3.76× its 1949 level", loc="left")
+ax.set_xlabel("year")
+ax.set_ylabel("passengers, millions")
+ax.grid(True)
+```
+
+## Stage 2 — the original house style
+
+**Line chart because one temporal + one quantitative variable + show evolution against a
+1949 baseline.**
+
+```{python}
+#| label: lineage-house
+#| fig-cap: "Stage 2 — the original house system adds accent, unit-aware ticks, restrained grid, and a takeaway title."
+house_style.apply_theme("executive")
+fig, ax = plt.subplots(figsize=(7.2, 4.5), constrained_layout=True)
+ax.plot(lineage_years, lineage_passengers_m, color=house_style.ACCENT, lw=2.6)
+house_style.polish(ax, grid="y")
+lock_lineage_axes(ax)
+label_lineage_endpoints(ax, lineage_years, lineage_passengers_m, house_style.ACCENT)
+house_style.takeaway_title(
+    ax,
+    "Annual passenger total reached 3.76× its 1949 level",
+    sub="Annual sum of reported monthly counts · millions",
+)
+```
+
+## Stage 3 — Fable
+
+**Line chart because one temporal + one quantitative variable + show evolution against a
+1949 baseline.** `read`, because the figure lives in a report body; A1, because a familiar
+line chart carries the finding.
+
+```{python}
+#| label: lineage-fable
+#| fig-cap: "Stage 3 — Fable publishes the same evidence with editorial anatomy, interpretation, and provenance."
+fable.theme("read")
+fig, ax = fable.page(
+    size=(7.2, 4.5),
+    kicker="Air travel · 1949–1960",
+    title="Annual passenger total reached 3.76× its 1949 level",
+    dek="Annual sum of reported monthly passenger counts, millions.",
+    source="Source: Box & Jenkins airline series, via seaborn-data",
+)
+ax.plot(lineage_years, lineage_passengers_m, color=fable.ACCENT)
+fable.finish(ax)
+lock_lineage_axes(ax)
+label_lineage_endpoints(ax, lineage_years, lineage_passengers_m, fable.ACCENT)
+fable.mark(
+    ax,
+    lineage_years[-1], lineage_passengers_m[-1],
+    "1960 · 5.71m", dx=-58, dy=-24, color=fable.INK,
+)
+```
+
+## Stage 4 — Witness
+
+**Line chart because one temporal + one quantitative variable + show evolution against a
+1949 baseline.** `explain × html`, because the reader should see the comparison and its
+boundary at report-reading distance.
+
+```{python}
+#| label: lineage-witness
+#| fig-cap: "Stage 4 — Witness makes the comparator, evidence role, scope, boundary, and absence of inferential uncertainty part of the exported object."
+lineage_claim = witness.Claim(
+    statement="Annual passenger total reached 3.76× its 1949 level",
+    measure="sum of twelve reported monthly counts",
+    comparison="1960 annual total divided by the 1949 annual total",
+    scope="Box–Jenkins airline series, calendar years 1949–1960",
+    source="Box & Jenkins airline series, via seaborn-data",
+    method="NumPy sum within calendar year; displayed in millions",
+    uncertainty="No inferential interval is claimed",
+    caveat="The historical series does not establish why passenger volume increased.",
+    alt=(
+        "A line rises every year from 1.52 million passengers in 1949 to "
+        "5.71 million in 1960; the final value is 3.76 times the first."
+    ),
+)
+witness.theme(purpose="explain", medium="html")
+fig, ax = witness.frame(lineage_claim, figsize=(7.2, 4.5))
+line = ax.plot(lineage_years, lineage_passengers_m, color=witness.EVIDENCE)[0]
+witness.tag(
+    line, "observation", label="reported annual total",
+    redundant="continuous line + endpoint values",
+)
+witness.reference(
+    ax,
+    lineage_passengers_m[0],
+    axis="y",
+    label="1949 baseline",
+    source="first annual total",
+)
+witness.bracket(
+    ax,
+    lineage_years[0], lineage_years[-1],
+    5.93, "3.76×",
+)
+witness.finish(fig, ax)
+lock_lineage_axes(ax)
+label_lineage_endpoints(ax, lineage_years, lineage_passengers_m, witness.EVIDENCE)
+```
+
+The four figures share a chart. What changes is the system's answer to a different question:
+*what must remain recoverable after the figure leaves the notebook?*
+
+::: {.callout-important}
+## Extract — the lineage rules
+
+1. Chart choice precedes style; every stage draws the same line for the same reason.
+2. Editorial anatomy improves context. Evidence anatomy adds comparator, boundary, and roles.
+3. A system comparison freezes the analysis before changing the surface.
+:::
+
+# Evidence roles are native Artists
+
+Witness attaches a role to the Artist the caller already owns. `tag()` returns that same
+object, gives it a stable SVG group id, and records a redundant channel for the audit.
+
+**Line chart with reference and comparison bracket because one temporal + one quantitative
+variable + inspect the evidence roles behind an endpoint comparison.**
+
+```{python}
+#| label: semantic-native-artists
+#| fig-cap: "The visible line, baseline, and bracket are ordinary Matplotlib Artists with semantic roles and stable SVG group ids."
+witness.theme(purpose="inspect", medium="html")
+semantic_fig, semantic_ax = witness.frame(lineage_claim)
+semantic_line = semantic_ax.plot(
+    lineage_years, lineage_passengers_m,
+    color=witness.EVIDENCE, marker="o", ms=4,
+)[0]
+same_line = witness.tag(
+    semantic_line,
+    "observation",
+    label="reported annual total",
+    redundant="line + circular samples",
+)
+semantic_reference = witness.reference(
+    semantic_ax,
+    lineage_passengers_m[0],
+    label="1949 comparator",
+    source="first annual total",
+)
+semantic_bracket = witness.bracket(
+    semantic_ax,
+    lineage_years[0], lineage_years[-1],
+    5.93, "1960 / 1949 = 3.76",
+)
+witness.finish(semantic_fig, semantic_ax)
+lock_lineage_axes(semantic_ax)
+
+assert same_line is semantic_line
+assert isinstance(same_line, Line2D)
+assert isinstance(semantic_reference, Line2D)
+assert isinstance(semantic_bracket, Artist)
+```
+
+```{python}
+#| label: semantic-ledger
+semantic_registry = semantic_fig._witness_registry
+print(f"{'SVG GROUP':<28} {'MATPLOTLIB TYPE':<20} {'ROLE'}")
+print("─" * 67)
+for artist in semantic_registry:
+    print(
+        f"{artist.get_gid():<28} "
+        f"{type(artist).__name__:<20} "
+        f"{artist._witness_role}"
+    )
+```
+
+| Evidence role | Primary form | Redundant channel |
+|---|---|---|
+| observation | small mark | marker shape |
+| estimate | heavier mark | size / weight |
+| model | continuous trace | stroke / dash |
+| uncertainty | named interval | edge / hatch |
+| comparator | baseline or peer | label / position |
+| reference | external threshold | dash + source |
+| context | lower hierarchy | lighter stroke |
+| exception | limiting evidence | outline + annotation |
+| decision | action region or rail | hatch + printed status |
+
+::: {.callout-important}
+## Extract — the semantic rules
+
+1. Role is metadata on an Artist, not a colour name.
+2. Colour alone never carries an essential distinction.
+3. Stable GIDs make the SVG a semantic document rather than a flat picture.
+:::
+
+# Purpose is not medium
+
+Purpose answers *why the figure exists*. Medium answers *where it must work*. A detailed
+inspection can live in HTML or print; an explanation can live in HTML or on a slide. One
+switch should not pretend these are the same decision.
+
+```{python}
+#| label: ring-slot-data
+ring_slot = load("rf_ring_slot")
+frequency_ghz = ring_slot["freq_ghz"]
+s11_db = 20 * np.log10(np.abs(ring_slot["s11"]))
+notch_index = int(np.argmin(s11_db))
+notch_frequency_ghz = frequency_ghz[notch_index]
+notch_s11_db = s11_db[notch_index]
+
+print(f"samples: {frequency_ghz.size}")
+print(f"range: {frequency_ghz[0]:.0f}–{frequency_ghz[-1]:.0f} GHz")
+print(f"minimum S11: {notch_s11_db:.2f} dB at {notch_frequency_ghz:.2f} GHz")
+```
+
+```{python}
+#| label: ring-slot-claim
+ring_slot_claim = witness.Claim(
+    statement="The provided S11 trace bottoms at −20.83 dB near 85.85 GHz",
+    measure="20·log10(|S11|)",
+    comparison="the minimum versus the surrounding 75–110 GHz response",
+    scope="201 provided Touchstone samples spanning 75–110 GHz",
+    source="scikit-rf sample data, ring slot.s2p",
+    method="Complex S11 converted to dB with NumPy; no smoothing",
+    uncertainty="No repeat sweeps or calibration uncertainty were supplied",
+    caveat="Device, fixture, calibration, and environmental conditions are absent.",
+    alt=(
+        "An S11 line over 75 to 110 GHz has a narrow trough. The lowest sample "
+        "is minus 20.83 dB at 85.85 GHz. No uncertainty interval is available."
+    ),
+)
+```
+
+## Explain × HTML
+
+**Line chart because one ordered frequency variable + one quantitative response + locate a
+narrow resonance without implying an external pass/fail threshold.**
+
+```{python}
+#| label: purpose-explain-html
+#| fig-cap: "Explain × HTML: one full-band trace and one direct notch annotation, with the missing measurement context kept on the page."
+witness.theme(purpose="explain", medium="html")
+ring_explain_fig, ring_explain_ax = witness.frame(ring_slot_claim)
+ring_explain_line = ring_explain_ax.plot(
+    frequency_ghz, s11_db, color=witness.EVIDENCE,
+)[0]
+witness.tag(
+    ring_explain_line, "observation", label="provided S11 samples",
+    redundant="solid line + direct minimum label",
+)
+ring_minimum = ring_explain_ax.scatter(
+    [notch_frequency_ghz], [notch_s11_db],
+    s=46, marker="D", color=witness.EXCEPTION, zorder=5,
+)
+witness.tag(
+    ring_minimum, "estimate", label="minimum sampled S11",
+    redundant="diamond + printed value",
+)
+ring_explain_ax.annotate(
+    f"{notch_s11_db:.2f} dB\n{notch_frequency_ghz:.2f} GHz".replace("-", "−"),
+    (notch_frequency_ghz, notch_s11_db),
+    xytext=(13, -2), textcoords="offset points",
+    color=witness.EXCEPTION, fontproperties=witness.BODY_SEMIBOLD,
+)
+ring_explain_ax.set_xlim(75, 110)
+ring_explain_ax.set_ylim(-23, 0)
+witness.finish(ring_explain_fig, ring_explain_ax)
+witness.units(ring_explain_ax, axis="x", kind="ghz")
+witness.units(ring_explain_ax, axis="y", kind="db")
+```
+
+## Explain × slide
+
+**Line chart because one ordered frequency variable + one quantitative response + explain
+the same narrow resonance at presentation distance.**
+
+```{python}
+#| label: medium-explain-slide
+#| fig-cap: "Explain × slide: the analysis is re-composed at 16:9 with larger type and fewer ticks; it is not a resized report figure."
+witness.theme(purpose="explain", medium="slide")
+ring_slide_fig, ring_slide_ax = witness.frame(ring_slot_claim)
+ring_slide_line = ring_slide_ax.plot(
+    frequency_ghz, s11_db, color=witness.EVIDENCE,
+)[0]
+witness.tag(
+    ring_slide_line, "observation", label="provided S11 samples",
+    redundant="solid line + direct minimum label",
+)
+ring_slide_minimum = ring_slide_ax.scatter(
+    [notch_frequency_ghz], [notch_s11_db],
+    s=84, marker="D", color=witness.EXCEPTION, zorder=5,
+)
+witness.tag(
+    ring_slide_minimum, "estimate", label="minimum sampled S11",
+    redundant="diamond + printed value",
+)
+ring_slide_ax.annotate(
+    "−20.83 dB\nat 85.85 GHz",
+    (notch_frequency_ghz, notch_s11_db),
+    xytext=(20, 4), textcoords="offset points",
+    fontsize=13, color=witness.EXCEPTION,
+    fontproperties=witness.BODY_SEMIBOLD,
+)
+ring_slide_ax.set_xlim(75, 110)
+ring_slide_ax.set_ylim(-23, 0)
+witness.finish(ring_slide_fig, ring_slide_ax)
+ring_slide_ax.xaxis.set_major_locator(FixedLocator([75, 90, 110]))
+ring_slide_ax.yaxis.set_major_locator(FixedLocator([-20, -10, 0]))
+witness.units(ring_slide_ax, axis="x", kind="ghz")
+witness.units(ring_slide_ax, axis="y", kind="db")
+```
+
+The slide composition leaves as vector SVG/PDF plus a high-resolution PNG; its receipt
+records the 13.333 × 7.5 inch physical canvas rather than pretending a report figure was
+stretched to fit.
+
+```{python}
+#| label: medium-explain-slide-export
+ring_slide_bundle = witness.save(
+    ring_slide_fig,
+    "ring_slot_explain_slide",
+    formats=("svg", "pdf", "png"),
+    strict=True,
+    data_fingerprints={
+        "frequency_and_s11": witness.fingerprint(frequency_ghz, ring_slot["s11"]),
+    },
+)
+ring_slide_receipt = json.loads(
+    ring_slide_bundle.receipt.read_text(encoding="utf-8")
+)
+print("slide inches:", ring_slide_receipt["figure_inches"])
+print("slide formats:", ", ".join(sorted(ring_slide_bundle.paths)))
+```
+
+## Inspect × HTML
+
+**Line with linked detail because one ordered frequency variable + one quantitative response
++ inspect a local minimum without discarding the full-band context.**
+
+```{python}
+#| label: purpose-inspect-html
+#| fig-cap: "Inspect × HTML: all 201 samples remain visible while a linked lens exposes the local structure around the minimum."
+witness.theme(purpose="inspect", medium="html")
+ring_inspect_fig, ring_inspect_ax = witness.frame(ring_slot_claim)
+ring_inspect_line = ring_inspect_ax.plot(
+    frequency_ghz, s11_db,
+    color=witness.EVIDENCE, marker="o", ms=2.3,
+)[0]
+witness.tag(
+    ring_inspect_line, "observation", label="provided S11 samples",
+    redundant="line + circular samples",
+)
+ring_detail_ax = witness.linked_detail(
+    ring_inspect_ax,
+    bounds=(0.59, 0.39, 0.37, 0.48),
+    xlim=(82.0, 90.1),
+    ylim=(-22.5, -8.0),
+    label="82–90.1 GHz detail",
+)
+ring_detail_line = ring_detail_ax.plot(
+    frequency_ghz, s11_db,
+    color=witness.EVIDENCE, marker="o", ms=2.0, lw=1.4,
+)[0]
+witness.tag(
+    ring_detail_line, "context", label="linked local samples",
+    redundant="inset position + circular samples",
+)
+ring_detail_minimum = ring_detail_ax.scatter(
+    [notch_frequency_ghz], [notch_s11_db],
+    s=28, marker="D", color=witness.EXCEPTION, zorder=5,
+)
+witness.tag(
+    ring_detail_minimum, "estimate", label="minimum sampled S11",
+    redundant="diamond + inset title",
+)
+ring_inspect_ax.set_xlim(75, 110)
+ring_inspect_ax.set_ylim(-23, 0)
+witness.finish(
+    ring_inspect_fig,
+    {"full band": ring_inspect_ax, "linked detail": ring_detail_ax},
+)
+witness.units(ring_inspect_ax, axis="x", kind="ghz")
+witness.units(ring_inspect_ax, axis="y", kind="db")
+```
+
+The first and second figures change only medium. The first and third change only purpose.
+The analysis remains fixed in all three.
+
+::: {.callout-important}
+## Extract — purpose × medium
+
+1. Purpose controls which evidence must be foregrounded.
+2. Medium controls physical composition and export.
+3. Re-compose for a slide; never stretch an HTML figure into one.
+4. A missing uncertainty statement does not disappear because the audience is far away.
+:::
+
+# Matplotlib remains the instrument
+
+The value of a semantic layer is not hiding Matplotlib. It is making difficult, high-value
+compositions reusable while returning every handle. This workshop draws the same ring-slot
+evidence with four coordinate systems at once.
+
+**Annotated line with linked detail because one ordered frequency variable + one quantitative
+response + explain a local feature while teaching how its annotations are physically placed.**
+
+```{python}
+#| label: workshop-transforms
+#| fig-cap: "Data anchors, point-offset bracket caps, an axes-fraction gutter, and a linked inset coexist on one native Matplotlib canvas."
+witness.theme(purpose="inspect", medium="html")
+workshop_fig, workshop_ax = witness.frame(ring_slot_claim)
+
+# Leave a physical gutter to the right of the Axes for display-resolved notes.
+workshop_ax.set_position((0.105, 0.205, 0.69, 0.53))
+workshop_line = workshop_ax.plot(
+    frequency_ghz, s11_db,
+    color=witness.EVIDENCE, marker="o", ms=2.1,
+)[0]
+witness.tag(
+    workshop_line, "observation", label="provided S11 samples",
+    redundant="line + sample markers",
+)
+
+# Bracket endpoints live in data coordinates; caps and copy use point offsets.
+inspection_bracket = witness.bracket(
+    workshop_ax,
+    82.0, 90.05, -7.0, "local inspection window",
+)
+
+# The gutter x-position is axes-relative; the evidence anchors remain in data.
+witness.margin_note(
+    workshop_ax,
+    notch_frequency_ghz, notch_s11_db,
+    "deepest sampled notch\n−20.83 dB",
+    role="exception",
+)
+nearby_index = int(np.argmin(np.abs(frequency_ghz - 86.2)))
+witness.margin_note(
+    workshop_ax,
+    frequency_ghz[nearby_index], s11_db[nearby_index],
+    "nearby response",
+    role="context",
+    color=witness.MUTED,
+)
+
+# linked_detail returns a native inset Axes; Matplotlib owns the connectors.
+workshop_inset = witness.linked_detail(
+    workshop_ax,
+    bounds=(0.58, 0.42, 0.38, 0.45),
+    xlim=(82.0, 90.1),
+    ylim=(-22.5, -8.0),
+    label="renderer-linked lens",
+)
+workshop_inset_line = workshop_inset.plot(
+    frequency_ghz, s11_db,
+    color=witness.EVIDENCE, marker="o", ms=1.8, lw=1.3,
+)[0]
+witness.tag(
+    workshop_inset_line, "context", label="local trace in inset",
+    redundant="inset placement + sample markers",
+)
+
+workshop_ax.set_xlim(75, 110)
+workshop_ax.set_ylim(-23, 0)
+witness.finish(
+    workshop_fig,
+    {"overview": workshop_ax, "detail": workshop_inset},
+)
+witness.units(workshop_ax, axis="x", kind="ghz")
+witness.units(workshop_ax, axis="y", kind="db")
+```
+
+```{python}
+#| label: workshop-native-handles
+workshop_connectors = [
+    artist
+    for artist in workshop_ax.get_children()
+    if isinstance(artist, ConnectionPatch)
+]
+
+print(f"overview: {type(workshop_ax).__name__}")
+print(f"trace: {type(workshop_line).__name__}")
+print(f"bracket: {type(inspection_bracket).__name__}")
+print(f"inset: {type(workshop_inset).__name__}")
+print(f"connection patches: {len(workshop_connectors)}")
+print(f"semantic gid: {workshop_line.get_gid()}")
+```
+
+The collision pass happens only after `fig.canvas.draw()` gives the notes real display-space
+extents. The result is converted back to a data-coordinate y-position. The analytical mark
+never leaves data coordinates; only its explanation occupies the gutter.
+
+::: {.callout-important}
+## Extract — the Artist rules
+
+1. Data stays in data coordinates; layout belongs to axes, figure, display, and point space.
+2. Measure text after the renderer exists, not by guessing string length.
+3. Insets preserve overview; they do not silently replace it.
+4. Bespoke composition is still native `Artist`, `Axes`, transform, and connector work.
+:::
+
+# Every export leaves a receipt
+
+An export audit has two jobs: block deterministic structural failures and record everything
+else honestly. Warnings and human-review prompts remain visible; `strict=True` is not a truth
+certificate.
+
+## Deliberate failure
+
+**Line chart because one ordered variable + one quantitative response + demonstrate that a
+structurally incomplete shared figure is rejected before export.**
+
+```{python}
+#| label: audit-fail
+invalid_claim = witness.Claim(
+    statement="A response rises",
+    measure="response",
+    comparison="",
+    scope="two illustrative points",
+    source="",
+    method="identity transform",
+    uncertainty="No inferential interval is claimed",
+    caveat="Illustrative audit failure.",
+    alt=None,
+)
+witness.theme(purpose="explain", medium="html")
+invalid_fig, invalid_ax = witness.frame(invalid_claim)
+invalid_line = invalid_ax.plot([0, 1], [1, 2], color=witness.EVIDENCE)[0]
+witness.tag(
+    invalid_line, "observation", label="illustrative points",
+    redundant="line + endpoints",
+)
+witness.finish(invalid_fig, invalid_ax)
+
+try:
+    witness.save(invalid_fig, "must_not_export", strict=True)
+except AuditError as error:
+    print("Strict export blocked:")
+    for finding in error.report.errors:
+        print(f"  {finding.code}")
+finally:
+    plt.close(invalid_fig)
+```
+
+## Accessible SVG + HTML
+
+The inspected S11 figure already has a complete contract, tagged Artists, and a finished
+layout. Saving it produces SVG, HTML, PNG, and a receipt. The SVG keeps text as text, embeds
+all three IBM Plex roles, and preserves every semantic `gid` group.
+
+```{python}
+#| label: export-accessible-bundle
+ring_bundle = witness.save(
+    ring_inspect_fig,
+    "ring_slot_inspect",
+    formats=("svg", "html", "png"),
+    strict=True,
+    data_fingerprints={
+        "frequency_and_s11": witness.fingerprint(frequency_ghz, ring_slot["s11"]),
+        "visible_s11_db": witness.fingerprint(frequency_ghz, s11_db),
+    },
+)
+ring_receipt = json.loads(ring_bundle.receipt.read_text(encoding="utf-8"))
+
+print(f"audit status: {ring_receipt['audit']['status']}")
+print(f"formats: {', '.join(sorted(ring_bundle.paths))}")
+print(f"selectable text nodes: {ring_receipt['svg_accessibility']['selectable_text_nodes']}")
+print(
+    "embedded faces: "
+    + ", ".join(ring_receipt["svg_accessibility"]["embedded_font_families"])
+)
+```
+
+```{python}
+#| label: export-svg-proof
+svg_namespace = {"svg": "http://www.w3.org/2000/svg"}
+svg_root = ET.parse(ring_bundle["svg"]).getroot()
+svg_text_nodes = svg_root.findall(".//svg:text", svg_namespace)
+svg_font_style = svg_root.find(".//svg:style[@id='witness-fonts']", svg_namespace)
+svg_css = svg_font_style.text or ""
+semantic_groups = [
+    element.get("id")
+    for element in svg_root.findall(".//svg:g", svg_namespace)
+    if (element.get("id") or "").startswith("witness-")
+]
+
+assert svg_root.get("role") == "img"
+assert svg_root.get("aria-labelledby")
+assert svg_text_nodes
+assert ring_inspect_line.get_gid() in semantic_groups
+assert all(
+    family in svg_css
+    for family in ("IBM Plex Serif", "IBM Plex Sans", "IBM Plex Mono")
+)
+assert "http://" not in svg_css and "https://" not in svg_css
+
+print("role=img:", svg_root.get("role") == "img")
+print("selectable text:", bool(svg_text_nodes))
+print("semantic groups:", len(semantic_groups))
+print("external font resources: none")
+```
+
+```{python}
+#| label: export-html-proof
+html_document = ring_bundle["html"].read_text(encoding="utf-8")
+assert "<figure" in html_document
+assert "<figcaption" in html_document
+assert '<details class="witness-receipt">' in html_document
+assert "<script" not in html_document
+assert "https://" not in html_document
+
+print("inline SVG + visible caption + text summary: yes")
+print("collapsible evidence receipt: yes")
+print("JavaScript or external resources: none")
+```
+
+```{python}
+#| label: export-receipt
+receipt_view = {
+    "system": ring_receipt["system"],
+    "purpose": ring_receipt["purpose"],
+    "medium": ring_receipt["medium"],
+    "role_counts": ring_receipt["role_counts"],
+    "audit": ring_receipt["audit"]["counts"],
+    "runtime": ring_receipt["runtime"],
+    "hashed_artifacts": sorted(ring_receipt["artifact_hashes"]),
+    "palette_minimums": {
+        "text_contrast": min(ring_receipt["palette"]["text_contrast"].values()),
+        "mark_contrast": min(ring_receipt["palette"]["mark_contrast"].values()),
+        "system_cvd_delta_e": min(
+            ring_receipt["design_palette"]["cvd_min_delta_e"].values()
+        ),
+    },
+    "svg_accessibility": ring_receipt["svg_accessibility"]["passed"],
+}
+print(json.dumps(receipt_view, indent=2, ensure_ascii=False))
+```
+
+The exported SVG below is the browser proof: its title is IBM Plex Serif, working text is
+IBM Plex Sans, numerals use IBM Plex Mono, and every glyph remains selectable.
+
+```{python}
+#| label: export-font-proof
+#| output: asis
+plt.close(ring_inspect_fig)
+display(SVG(filename=str(ring_bundle["svg"])))
+```
+
+::: {.callout-important}
+## Extract — the export rules
+
+1. Strict export blocks missing claim structure and unnamed uncertainty.
+2. Accessible SVG keeps `<text>`, `<title>`, `<desc>`, ARIA links, semantic groups, and fonts.
+3. HTML adds a visible caption, equivalent text summary, and no-script receipt.
+4. A receipt describes the rendering process; it does not certify the scientific claim.
+:::
+
+# Scientific capstone — estimation, not decoration
+
+**Principle.** A small scientific comparison should show the observations, name the
+estimand, print the interval semantics, expose missingness, and retain the boundary between a
+descriptive contrast and a population or causal claim.
+
+```{python}
+#| label: penguin-data
+penguins = load("penguins")
+penguin_species = penguins["species"]
+penguin_mass_kg = penguins["body_mass_g"] / 1_000
+penguin_sex = penguins["sex"]
+
+species_order = np.array(["Adelie", "Chinstrap", "Gentoo"])
+species_display = np.array(["Adélie", "Chinstrap", "Gentoo"])
+species_colors = {
+    "Adelie": witness.EVERGREEN,
+    "Chinstrap": witness.BRICK,
+    "Gentoo": witness.VIOLET,
+}
+species_markers = {"Adelie": "o", "Chinstrap": "s", "Gentoo": "^"}
+mass_by_species = {
+    species: penguin_mass_kg[penguin_species == species]
+    for species in species_order
+}
+
+adelie_mass = mass_by_species["Adelie"]
+chinstrap_mass = mass_by_species["Chinstrap"]
+gentoo_mass = mass_by_species["Gentoo"]
+
+gentoo_difference = bootstrap_mean_difference(
+    gentoo_mass, adelie_mass, seed=20260712,
+)
+chinstrap_difference = bootstrap_mean_difference(
+    chinstrap_mass, adelie_mass, seed=20260713,
+)
+```
+
+```{python}
+#| label: penguin-estimands
+print(f"{'species':<11} {'n':>4} {'mean kg':>9} {'median':>9} {'sd':>8} {'range':>14}")
+print("─" * 61)
+for species, display_name in zip(species_order, species_display):
+    masses = mass_by_species[species]
+    print(
+        f"{display_name:<11} {masses.size:>4d} "
+        f"{masses.mean():>9.3f} {np.median(masses):>9.3f} "
+        f"{masses.std(ddof=1):>8.3f} "
+        f"{masses.min():>5.3f}–{masses.max():<5.3f}"
+    )
+
+print()
+for label, result in (
+    ("Gentoo − Adélie", gentoo_difference),
+    ("Chinstrap − Adélie", chinstrap_difference),
+):
+    estimate, low, high = result
+    print(f"{label:<22} {estimate:+.3f} kg  95% interval [{low:.3f}, {high:.3f}]")
+```
+
+## Observations + difference rail
+
+**Estimation plot with raw strips and a difference rail because one categorical + one
+quantitative variable + compare distributions while quantifying differences in means.**
+
+```{python}
+#| label: penguin-capstone
+#| fig-cap: "Observations and estimands share one page: the Gentoo mean shift is large, Chinstrap is nearly unchanged, and every interval says what it represents."
+penguin_claim = witness.Claim(
+    statement="Gentoo mean body mass was 1.38 kg above Adélie; Chinstrap was nearly the same",
+    measure="difference in arithmetic mean body mass, kg",
+    comparison="each species minus Adélie",
+    scope="342 complete Palmer penguin records",
+    source="Palmer Station LTER, via seaborn-data",
+    method="Independent within-species percentile bootstrap; 10,000 resamples",
+    uncertainty="95% percentile-bootstrap interval for the difference in means",
+    caveat=(
+        "Descriptive and unadjusted for sex and island; the interval does not "
+        "represent measurement error or population representativeness."
+    ),
+    alt=(
+        "Raw body-mass observations are shown for 151 Adélie, 68 Chinstrap, and "
+        "123 Gentoo penguins. Mean masses are 3.70, 3.73, and 5.08 kilograms. "
+        "The Gentoo-minus-Adélie mean difference is 1.38 kilograms with a 95 "
+        "percent bootstrap interval from 1.26 to 1.49 kilograms. The "
+        "Chinstrap-minus-Adélie interval crosses zero."
+    ),
+)
+
+witness.theme(purpose="inspect", medium="html")
+penguin_fig, penguin_axes = witness.frame(
+    penguin_claim,
+    mosaic=[["raw", "raw", "effect"]],
+    figsize=(10.8, 6.4),
+    gridspec_kw={
+        "width_ratios": [1.0, 1.0, 0.95],
+        "top": 0.69,
+        "wspace": 0.42,
+    },
+)
+raw_ax = penguin_axes["raw"]
+effect_ax = penguin_axes["effect"]
+
+jitter_rng = np.random.default_rng(1701)
+for row, species in enumerate(species_order):
+    masses = mass_by_species[species]
+    row_position = row + 1
+    jitter = jitter_rng.normal(0, 0.055, masses.size)
+    observations = raw_ax.scatter(
+        masses, row_position + jitter,
+        s=24, marker=species_markers[species],
+        color=species_colors[species], alpha=0.70,
+        edgecolor=witness.SURFACE, linewidth=0.35,
+    )
+    witness.tag(
+        observations, "observation", label=f"{species} body mass",
+        redundant=f"{species_markers[species]} marker + labelled row",
+    )
+    mean_marker = raw_ax.scatter(
+        [masses.mean()], [row_position],
+        s=110, marker="D", color=species_colors[species],
+        edgecolor=witness.INK, linewidth=0.8, zorder=5,
+    )
+    witness.tag(
+        mean_marker, "estimate", label=f"{species} arithmetic mean",
+        redundant="diamond + printed n and mean",
+    )
+    raw_ax.annotate(
+        f"mean {masses.mean():.2f} kg · n={masses.size}",
+        (masses.mean(), row_position), xytext=(0, 13), textcoords="offset points",
+        ha="center", color=species_colors[species],
+        fontproperties=witness.BODY_SEMIBOLD, fontsize=8,
+    )
+
+raw_ax.set_xlim(2.5, 6.55)
+raw_ax.set_ylim(0.55, 3.55)
+raw_ax.set_yticks([1, 2, 3], species_display)
+witness.panel_title(raw_ax, "Observed body mass")
+
+effect_results = [chinstrap_difference, gentoo_difference]
+effect_labels = ["Chinstrap − Adélie", "Gentoo − Adélie"]
+effect_colors = [witness.BRICK, witness.VIOLET]
+for column, (result, label, color) in enumerate(
+    zip(effect_results, effect_labels, effect_colors)
+):
+    estimate, low, high = result
+    witness.interval(
+        effect_ax,
+        [column - 0.15, column + 0.15],
+        [low, low], [high, high],
+        kind="95% percentile-bootstrap interval",
+        label=f"{label} interval",
+        color=color, alpha=0.18, hatch="///",
+    )
+    estimate_marker = effect_ax.scatter(
+        [column], [estimate],
+        s=90, marker="D", color=color,
+        edgecolor=witness.INK, linewidth=0.8, zorder=5,
+    )
+    witness.tag(
+        estimate_marker, "estimate", label=f"{label} mean difference",
+        redundant="diamond + printed interval",
+    )
+    effect_ax.annotate(
+        f"{true_minus(estimate)}\n[{low:.2f}, {high:.2f}]",
+        (column, high), xytext=(0, 8), textcoords="offset points",
+        ha="center", color=color, fontproperties=witness.MONO, fontsize=8,
+    )
+
+effect_ax.set_xlim(-0.55, 1.55)
+effect_ax.set_ylim(-0.30, 1.70)
+effect_ax.set_xticks([0, 1], ["Chinstrap\n− Adélie", "Gentoo\n− Adélie"])
+witness.panel_title(effect_ax, "Difference from Adélie")
+
+witness.finish(penguin_fig, raw_ax, grid="x")
+witness.finish(penguin_fig, effect_ax, grid="y")
+
+# finish() draws an honest zero rule for signed data. Tag that native line as
+# the comparison baseline instead of drawing a duplicate.
+effect_zero = next(
+    line for line in effect_ax.lines
+    if (line.get_gid() or "").startswith("witness-structure-zero-")
+)
+witness.tag(
+    effect_zero, "comparator", label="no mean difference",
+    redundant="zero position + signed interval labels",
+)
+witness.units(raw_ax, axis="x", kind="kg")
+witness.units(effect_ax, axis="y", kind="kg")
+```
+
+The strip shows why the effect is not an individual classifier: the species ranges overlap.
+The rail answers a different question — the estimated difference in sample means under a
+declared resampling procedure.
+
+## Boundary check — sex strata
+
+Nine plotted birds have unknown sex: five Adélie and four Gentoo. A small sensitivity check
+does not turn the study causal, but it tests whether the primary contrast simply vanishes
+inside the two recorded sex strata.
+
+```{python}
+#| label: penguin-boundary
+for sex, seed in (("female", 20260714), ("male", 20260715)):
+    adelie_of_sex = penguin_mass_kg[
+        (penguin_species == "Adelie") & (penguin_sex == sex)
+    ]
+    gentoo_of_sex = penguin_mass_kg[
+        (penguin_species == "Gentoo") & (penguin_sex == sex)
+    ]
+    estimate, low, high = bootstrap_mean_difference(
+        gentoo_of_sex, adelie_of_sex, seed=seed,
+    )
+    print(
+        f"{sex:<6}  Gentoo n={gentoo_of_sex.size:>2}  "
+        f"Adélie n={adelie_of_sex.size:>2}  "
+        f"difference {estimate:+.3f} kg  [{low:.3f}, {high:.3f}]"
+    )
+
+print(f"unknown sex records: {np.count_nonzero(penguin_sex == 'unknown')}")
+```
+
+Subgroup stability is not causal adjustment. Island, sampling, and measurement boundaries
+remain. Witness keeps that sentence on the figure rather than rewarding a more ambitious
+title.
+
+```{python}
+#| label: penguin-export
+penguin_bundle = witness.save(
+    penguin_fig,
+    "penguin_estimation",
+    formats=("svg", "html", "png"),
+    strict=True,
+    data_fingerprints={
+        "body_mass_and_species": witness.fingerprint(
+            penguin_mass_kg, penguin_species,
+        ),
+    },
+)
+# Keep the README's Witness hero reproducible from this source document.
+penguin_fig.savefig(
+    "../assets/witness-penguin-estimation.png",
+    dpi=200,
+    metadata={"Title": penguin_claim.statement},
+)
+penguin_report = witness.audit(penguin_fig)
+print("audit status:", penguin_report.status)
+print("deterministic errors:", len(penguin_report.errors))
+```
+
+::: {.callout-important}
+## Extract — the estimation rules
+
+1. Small-n summaries do not replace observations.
+2. The figure names the estimand, resampling unit, interval, and seed.
+3. A confidence interval is not measurement error or a guarantee of representativeness.
+4. Sensitivity checks narrow a boundary; they do not erase it.
+:::
+
+# RF capstone — a decision that remains provisional
+
+**Principle.** A decision view is most valuable where it refuses false certainty. The RF
+dataset below is a deterministic synthetic model. Its curves are not measurements, its three
+thresholds are tutorial references rather than manufacturer specifications, and it contains
+no uncertainty model. Those facts control the language and the semantic roles.
+
+```{python}
+#| label: rf-data
+dut = load("rf_dut_report")
+dut_frequency_ghz = dut["freq_ghz"]
+dut_gain_db = dut["gain_db"]
+dut_nf_db = dut["noise_figure_db"]
+dut_return_loss_db = dut["return_loss_db"]
+dut_p1db_dbm = dut["output_p1db_dbm"]
+
+GAIN_FLOOR_DB = 18.0
+NF_CEILING_DB = 2.0
+RETURN_LOSS_CEILING_DB = -10.0
+
+gain_margin_db = dut_gain_db.min() - GAIN_FLOOR_DB
+nf_margin_db = NF_CEILING_DB - dut_nf_db.max()
+return_loss_margin_db = RETURN_LOSS_CEILING_DB - dut_return_loss_db.max()
+
+gain_fails = dut_gain_db < GAIN_FLOOR_DB
+gain_fail_starts = np.flatnonzero(gain_fails & ~np.r_[False, gain_fails[:-1]])
+gain_fail_ends = np.flatnonzero(gain_fails & ~np.r_[gain_fails[1:], False])
+first_gain_failure_ghz = dut_frequency_ghz[np.flatnonzero(gain_fails)[0]]
+longest_run = np.argmax(gain_fail_ends - gain_fail_starts)
+sustained_failure_start_ghz = dut_frequency_ghz[gain_fail_starts[longest_run]]
+
+print(f"samples: {dut_frequency_ghz.size} at 20 MHz spacing")
+print(f"gain margin: {gain_margin_db:+.3f} dB")
+print(f"noise-figure margin: {nf_margin_db:+.3f} dB")
+print(f"return-loss margin: {return_loss_margin_db:+.3f} dB")
+print(f"first sampled gain violation: {first_gain_failure_ghz:.2f} GHz")
+print(f"continuous violation run begins: {sustained_failure_start_ghz:.2f} GHz")
+```
+
+## Shared responses + decision rail
+
+**Shared-x response small multiples plus a decision rail because four quantitative responses
+over one continuous frequency variable + assess nominal margins against separate-unit
+references.**
+
+```{python}
+#| label: rf-capstone
+#| fig-cap: "A decision sheet that refuses to turn uncertainty-free synthetic curves into a compliance claim: model responses on the left, nominal margins and the evidence boundary on the rail."
+rf_claim = witness.Claim(
+    statement="The nominal gain model misses the illustrative 18 dB floor by 0.42 dB at 6 GHz",
+    measure="nominal response margin to tutorial-defined limits",
+    comparison="worst sampled value relative to each illustrative reference",
+    scope="251 synthetic samples, 1–6 GHz at 20 MHz spacing",
+    source="Deterministic generator in data/build_datasets.py",
+    method="Pointwise comparison of generated curves to illustrative limits",
+    uncertainty="No model or measurement uncertainty was supplied",
+    caveat=(
+        "Thresholds are tutorial references, not manufacturer specifications; "
+        "this is not a compliance result."
+    ),
+    alt=(
+        "Four shared-frequency panels show synthetic gain, noise figure, return "
+        "loss, and output P1dB. Gain falls 0.42 dB below an illustrative 18 dB "
+        "floor at 6 GHz. Noise figure and return loss remain nominally inside "
+        "their illustrative limits. A decision rail says uncertainty is absent, "
+        "so the assessment is provisional."
+    ),
+)
+
+witness.theme(purpose="decide", medium="html")
+rf_fig, rf_axes = witness.frame(
+    rf_claim,
+    mosaic=[
+        ["gain", "gain", "rail"],
+        ["nf", "nf", "rail"],
+        ["return", "return", "rail"],
+        ["p1db", "p1db", "rail"],
+    ],
+    figsize=(11.4, 8.8),
+    gridspec_kw={
+        "width_ratios": [1.0, 1.0, 0.78],
+        "top": 0.69,
+        "hspace": 0.72,
+        "wspace": 0.44,
+    },
+)
+gain_ax = rf_axes["gain"]
+nf_ax = rf_axes["nf"]
+return_ax = rf_axes["return"]
+p1db_ax = rf_axes["p1db"]
+decision_ax = rf_axes["rail"]
+
+response_specs = [
+    (
+        gain_ax, dut_gain_db, "Gain", "dB", (17.2, 22.6),
+        GAIN_FLOOR_DB, "18 dB tutorial floor", "below",
+    ),
+    (
+        nf_ax, dut_nf_db, "Noise figure", "dB", (1.0, 2.1),
+        NF_CEILING_DB, "2 dB tutorial ceiling", "above",
+    ),
+    (
+        return_ax, dut_return_loss_db, "Input return loss", "dB", (-24, -8),
+        RETURN_LOSS_CEILING_DB, "−10 dB tutorial ceiling", "above",
+    ),
+]
+
+for response_ax, values, title, unit, limits, threshold, label, fail_side in response_specs:
+    response_ax.set_ylim(*limits)
+    trace = response_ax.plot(
+        dut_frequency_ghz, values,
+        color=witness.MODEL, lw=1.8,
+    )[0]
+    witness.tag(
+        trace, "model", label=f"synthetic {title.lower()} response",
+        redundant=f"solid trace + {title} panel",
+    )
+    fail_limits = (
+        (limits[0], threshold) if fail_side == "below"
+        else (threshold, limits[1])
+    )
+    fail_region = response_ax.axhspan(
+        *fail_limits,
+        facecolor=witness.EXCEPTION, alpha=0.08,
+        edgecolor=witness.EXCEPTION, hatch="////", linewidth=0.0,
+    )
+    witness.tag(
+        fail_region, "decision", label=f"{title} nominal fail region",
+        redundant="hatch + direct threshold label",
+    )
+    witness.reference(
+        response_ax,
+        threshold,
+        label=label,
+        source="tutorial-defined reference",
+        color=witness.EXCEPTION,
+    )
+    witness.panel_title(response_ax, title)
+
+p1db_ax.set_ylim(15.5, 18.6)
+p1db_trace = p1db_ax.plot(
+    dut_frequency_ghz, dut_p1db_dbm,
+    color=witness.MODEL, lw=1.8,
+)[0]
+witness.tag(
+    p1db_trace, "model", label="synthetic output P1dB response",
+    redundant="solid trace + output P1dB panel",
+)
+witness.panel_title(p1db_ax, "Output P1dB")
+p1db_ax.text(
+    1, 1.02, "no tutorial limit",
+    transform=p1db_ax.transAxes,
+    ha="right", va="bottom",
+    color=witness.MUTED, fontproperties=witness.MONO, fontsize=7.5,
+)
+
+for response_ax in (nf_ax, return_ax, p1db_ax):
+    response_ax.sharex(gain_ax)
+gain_ax.set_xlim(1, 6)
+
+# The rail uses a common signed dB margin. Positive is inside the tutorial limit.
+decision_rows = np.arange(3)
+decision_margins = np.array([
+    gain_margin_db,
+    nf_margin_db,
+    return_loss_margin_db,
+])
+decision_labels = ["gain", "NF", "return loss"]
+decision_colors = [
+    witness.EXCEPTION if margin < 0 else witness.EVIDENCE
+    for margin in decision_margins
+]
+decision_bars = decision_ax.barh(
+    decision_rows,
+    decision_margins,
+    height=0.52,
+    color=decision_colors,
+    edgecolor=decision_colors,
+    hatch=["////" if margin < 0 else "" for margin in decision_margins],
+)
+for label, margin, bar in zip(decision_labels, decision_margins, decision_bars):
+    witness.tag(
+        bar, "decision", label=f"{label} nominal margin",
+        redundant="signed length + status label + hatch on failure",
+    )
+    decision_ax.annotate(
+        f"{true_minus(margin)} dB",
+        (0 if margin < 0 else margin, bar.get_y() + bar.get_height() / 2),
+        xytext=(6, 0), textcoords="offset points",
+        ha="left", va="center",
+        color=witness.EVIDENCE if margin >= 0 else witness.EXCEPTION,
+        fontproperties=witness.MONO, fontsize=8,
+    )
+
+decision_ax.set_yticks(decision_rows, decision_labels)
+decision_ax.set_xlim(-1.2, 3.5)
+decision_ax.set_ylim(-0.7, 3.35)
+decision_ax.text(
+    0.02, 0.86,
+    "OUTPUT P1dB\nnot assessed — no reference",
+    transform=decision_ax.transAxes,
+    va="top", color=witness.MUTED,
+    fontproperties=witness.BODY_SEMIBOLD, fontsize=8,
+)
+witness.reference(
+    decision_ax,
+    0,
+    axis="x",
+    label="zero",
+    source="computed pass/fail boundary",
+)
+witness.panel_title(decision_ax, "Nominal margin")
+
+witness.finish(rf_fig, [gain_ax, nf_ax, return_ax, p1db_ax], grid="y")
+witness.finish(rf_fig, decision_ax, grid="x")
+
+for response_ax in (gain_ax, nf_ax, return_ax):
+    response_ax.tick_params(labelbottom=False)
+witness.units(gain_ax, axis="y", kind="db")
+witness.units(nf_ax, axis="y", kind="db")
+witness.units(return_ax, axis="y", kind="db")
+witness.units(p1db_ax, axis="y", kind="dbm")
+witness.units(p1db_ax, axis="x", kind="ghz")
+```
+
+The gain trace has isolated sampled violations from 5.56 GHz and a continuous violation run
+from 5.74 GHz to the 6 GHz band edge. The title uses the least ambiguous result instead: the
+minimum nominal margin is −0.42 dB at 6 GHz. Noise figure and return loss are only
+*nominally* inside their tutorial limits.
+
+```{python}
+#| label: rf-audit-boundary
+rf_report = witness.audit(rf_fig)
+print("audit status:", rf_report.status)
+print("deterministic errors:", len(rf_report.errors))
+print("warnings:")
+for finding in rf_report.warnings:
+    print(f"  {finding.code}: {finding.message}")
+print("human review prompts:")
+for finding in rf_report.reviews:
+    print(f"  {finding.code}: {finding.message}")
+```
+
+The expected missing-uncertainty warning is a feature. `strict=True` blocks deterministic
+errors but preserves this provisional decision in both the receipt and adjacent HTML text.
+
+```{python}
+#| label: rf-export
+rf_bundle = witness.save(
+    rf_fig,
+    "rf_nominal_decision",
+    formats=("svg", "html", "png"),
+    strict=True,
+    data_fingerprints={
+        "synthetic_dut_responses": witness.fingerprint(
+            dut_frequency_ghz,
+            dut_gain_db,
+            dut_nf_db,
+            dut_return_loss_db,
+            dut_p1db_dbm,
+        ),
+    },
+)
+rf_receipt = json.loads(rf_bundle.receipt.read_text(encoding="utf-8"))
+print("exported with audit status:", rf_receipt["audit"]["status"])
+print("model Artists:", rf_receipt["role_counts"].get("model", 0))
+print("decision Artists:", rf_receipt["role_counts"].get("decision", 0))
+```
+
+::: {.callout-important}
+## Extract — the decision rules
+
+1. Synthetic curves are `model`, never `observation`.
+2. A threshold identifies its source; tutorial references are not device specifications.
+3. Positive nominal margin is not compliance when material uncertainty is missing.
+4. Separate-unit response panels beat a twin axis; the rail compares only like-unit margins.
+5. A warning can be the most important finding on the page.
+:::
+
+# The system, distilled {.unnumbered}
+
+| Principle | Lever |
+|---|---|
+| argument before ornament | `Claim(...)` |
+| purpose and medium are orthogonal | `theme(purpose=, medium=)` |
+| semantic evidence, native Matplotlib | `tag()` |
+| uncertainty says what it is | `interval(kind=...)` |
+| comparison is explicit | `reference()` · `bracket()` |
+| caveats stay visible | `margin_note()` |
+| overview and detail remain linked | `linked_detail()` |
+| structure is audited | `audit()` · `finish()` |
+| export remains interrogable | `save()` + `*.receipt.json` |
+
+The complete shared-figure loop remains short:
+
+```python
+import witness
+
+witness.theme(purpose="explain", medium="html")
+fig, ax = witness.frame(claim)
+line = ax.plot(x, y)[0]                         # ordinary Matplotlib
+witness.tag(line, "observation", redundant="line + markers")
+witness.finish(fig, ax)
+witness.save(fig, "finding", strict=True)       # SVG + HTML + receipt
+```
+
+The craft still matters. Chart choice still matters. What Witness adds is a durable answer to
+the question that follows both: **what will a reader be able to recover from this figure when
+the notebook, analyst, and meeting are gone?**

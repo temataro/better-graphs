@@ -1,0 +1,37 @@
+name: Witness compatibility
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        matplotlib: ["3.8.*", "3.11.*"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync project environment
+        run: uv sync --python 3.11
+
+      - name: Select Matplotlib ${{ matrix.matplotlib }}
+        run: uv pip install "matplotlib==${{ matrix.matplotlib }}"
+
+      - name: Run Witness tests
+        run: uv run --no-sync python -m unittest discover -s tests -v
