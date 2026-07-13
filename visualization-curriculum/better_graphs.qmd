@@ -534,7 +534,7 @@ scatter answers the one we asked — and the cluster structure falls out for fre
 penguins = load("penguins")
 penguins = select(penguins, finite(penguins["flipper_length_mm"], penguins["body_mass_g"]))  # ≈ dropna
 species = ["Adelie", "Chinstrap", "Gentoo"]
-species_color = {"Adelie": ACCENT, "Chinstrap": "#E8833A", "Gentoo": "#1AA7A0"}  # 3 real series → 3 colours
+species_color = {"Adelie": ACCENT, "Chinstrap": house_style.OCHRE, "Gentoo": house_style.EMERALD}  # 3 series → SERIES[:3]
 
 fig, (bar_ax, scatter_ax) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True)
 
@@ -601,8 +601,8 @@ craft is sharing **one colour encoding** across them so the eye carries meaning 
 #| fig-cap: "subplot_mosaic: a main view plus two context panels, with a single continent colour key shared across them."
 gapminder_2007 = select(gapminder, gapminder["year"] == 2007)
 continent_color = {
-    "Africa": "#6400FF", "Americas": "#E8833A", "Asia": "#1AA7A0",
-    "Europe": "#C44E9C", "Oceania": "#5A8F3C",
+    "Africa": house_style.VIOLET, "Americas": house_style.OCHRE, "Asia": house_style.EMERALD,
+    "Europe": house_style.WINE, "Oceania": house_style.NAVY,
 }
 
 fig, mosaic = plt.subplot_mosaic(
@@ -763,7 +763,7 @@ dek_highlights=[...])` does exactly this: `<bracketed>` words in the dek take th
 ```{python}
 #| label: m3-keyed
 #| fig-cap: "Each country's name is coloured to its line in the dek — no legend box, no round-trip for the eye."
-series_color = {"China": ACCENT, "Brazil": "#1AA7A0"}
+series_color = {"China": ACCENT, "Brazil": house_style.EMERALD}
 
 
 def life_exp_in(country, year):
@@ -792,7 +792,7 @@ for country_name in series_color:
         color=series_color[country_name], lw=2.6,
     )
 house_style.finish(ax)
-ax.set_ylabel("Life expectancy (years)")
+house_style.ylabel_above(ax, "Life expectancy (years)")
 ```
 
 ## Before & after — a title that renames the axis vs. a page that carries the point
@@ -807,7 +807,7 @@ keys the species into the dek.
 adelie_mass = penguins["body_mass_g"][penguins["species"] == "Adelie"]
 gentoo_mass = penguins["body_mass_g"][penguins["species"] == "Gentoo"]
 pct_heavier = round(100 * (np.nanmean(gentoo_mass) / np.nanmean(adelie_mass) - 1))
-adelie_color, gentoo_color = ACCENT, "#1AA7A0"
+adelie_color, gentoo_color = ACCENT, house_style.EMERALD
 
 fig, ax = plt.subplots(figsize=(6.6, 4.4), constrained_layout=True)
 ax.hist(adelie_mass, bins=14, color=adelie_color, alpha=0.6, label="Adelie")
@@ -835,7 +835,7 @@ ax.hist(adelie_mass, bins=14, color=adelie_color, alpha=0.6)
 ax.hist(gentoo_mass, bins=14, color=gentoo_color, alpha=0.6)
 house_style.finish(ax)
 house_style.units(ax, "x", "count")
-ax.set_ylabel("Count")
+house_style.ylabel_above(ax, "Count")
 ```
 
 ::: {.callout-important}
@@ -1211,14 +1211,14 @@ fig, panels = house_style.page(
 gain_ax = panels["A"]
 gain_ax.plot(frequency_ghz, dut_report["gain_db"], color=GAIN_COLOR, lw=2)
 house_style.panel_title(gain_ax, "Gain")
-gain_ax.set_ylabel("Gain (dB)")
+house_style.ylabel_above(gain_ax, "Gain (dB)")
 house_style.finish(gain_ax)
 
 # B — noise figure over frequency
 noise_figure_ax = panels["B"]
 noise_figure_ax.plot(frequency_ghz, dut_report["noise_figure_db"], color=GREY, lw=2)
 house_style.panel_title(noise_figure_ax, "Noise figure")
-noise_figure_ax.set_ylabel("NF (dB)")
+house_style.ylabel_above(noise_figure_ax, "NF (dB)")
 house_style.finish(noise_figure_ax)
 
 # C — return loss over frequency, against the -10 dB match limit
@@ -1227,7 +1227,7 @@ return_loss_ax.plot(frequency_ghz, dut_report["return_loss_db"], color=GREY, lw=
 house_style.spec_band(return_loss_ax, -10, side="above", label="-10 dB match limit")
 house_style.panel_title(return_loss_ax, "Return loss")
 return_loss_ax.set_xlabel("Frequency (GHz)")
-return_loss_ax.set_ylabel(r"$S_{11}$ (dB)")
+house_style.ylabel_above(return_loss_ax, r"$S_{11}$ (dB)")
 house_style.finish(return_loss_ax)
 
 # D — PA compression: gain (left, dB) and PAE (right, %) share a drive axis but not a scale,
