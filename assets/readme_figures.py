@@ -27,15 +27,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import house_style
-from house_style import ACCENT, GREY
+from house_style import ACCENT, CONTEXT, SERIES
 from ndata import load, group, pivot, MONTHS
 
 DPI = 200
 
 
-def _save(fig, stem):
+def _save(fig, stem, tight=True):
     path = HERE / f"{stem}.png"
-    fig.savefig(path, dpi=DPI, bbox_inches="tight")
+    fig.savefig(path, dpi=DPI, bbox_inches="tight" if tight else None)
     plt.close(fig)
     print(f"  wrote  {stem}.png")
     return path
@@ -71,7 +71,7 @@ def rf_before():
 
 
 def rf_after():
-    house_style.apply_theme("detailed")
+    house_style.theme("study")
     dut_report = load("rf_dut_report")
     frequency_ghz = dut_report["freq_ghz"]
     power_amp = load("rf_pa_efficiency")
@@ -80,47 +80,45 @@ def rf_after():
     pae_pct = power_amp["pae_pct"]
 
     GAIN_COLOR = ACCENT
-    PAE_COLOR = house_style.CATEGORICAL[1]  # teal — the second series' key
+    PAE_COLOR = SERIES[1]  # emerald — the second series' key
 
-    fig, panels = plt.subplot_mosaic("AB\nCD", figsize=(11, 6.6), constrained_layout=True)
+    fig, panels = house_style.page(
+        size=(11, 6.6),
+        mosaic="AB\nCD",
+        kicker="RF DUT report · S-parameters & PA sweep",
+        title="Gain holds flat and return loss stays under spec across band",
+        dek="Four measurements, one consistent sheet.",
+        source="Source: synthesized RF DUT dataset",
+    )
 
     gain_ax = panels["A"]
     gain_ax.plot(frequency_ghz, dut_report["gain_db"], color=GAIN_COLOR, lw=2)
-    gain_ax.set_title("Gain", loc="left", fontsize=11)
+    house_style.panel_title(gain_ax, "Gain")
     gain_ax.set_ylabel("Gain (dB)")
-    house_style.despine(gain_ax)
+    house_style.finish(gain_ax)
 
     noise_figure_ax = panels["B"]
-    noise_figure_ax.plot(frequency_ghz, dut_report["noise_figure_db"], color=GREY, lw=2)
-    noise_figure_ax.set_title("Noise figure", loc="left", fontsize=11)
+    noise_figure_ax.plot(frequency_ghz, dut_report["noise_figure_db"], color=CONTEXT, lw=2)
+    house_style.panel_title(noise_figure_ax, "Noise figure")
     noise_figure_ax.set_ylabel("NF (dB)")
-    house_style.despine(noise_figure_ax)
+    house_style.finish(noise_figure_ax)
 
     return_loss_ax = panels["C"]
-    return_loss_ax.plot(frequency_ghz, dut_report["return_loss_db"], color=GREY, lw=2)
-    return_loss_ax.axhline(-10, ls="--", lw=1, color=ACCENT)
-    return_loss_ax.annotate(
-        "-10 dB match limit",
-        xy=(frequency_ghz[-1], -10),
-        xytext=(0, 4),
-        textcoords="offset points",
-        ha="right",
-        fontsize=8,
-        color=ACCENT,
-    )
-    return_loss_ax.set_title("Return loss", loc="left", fontsize=11)
+    return_loss_ax.plot(frequency_ghz, dut_report["return_loss_db"], color=CONTEXT, lw=2)
+    house_style.spec_band(return_loss_ax, -10, side="above", label="-10 dB match limit")
+    house_style.panel_title(return_loss_ax, "Return loss")
     return_loss_ax.set_xlabel("Frequency (GHz)")
     return_loss_ax.set_ylabel(r"$S_{11}$ (dB)")
-    house_style.despine(return_loss_ax)
+    house_style.finish(return_loss_ax)
 
     compression_ax = panels["D"]
     compression_ax.plot(input_drive_dbm, pa_gain_db, color=GAIN_COLOR, lw=2)
-    compression_ax.set_title("PA compression & efficiency", loc="left", fontsize=11)
+    house_style.panel_title(compression_ax, "PA compression & efficiency")
     compression_ax.set_xlabel("Input drive (dBm)")
     compression_ax.set_ylabel("Gain (dB)", color=GAIN_COLOR)
     compression_ax.tick_params(axis="y", colors=GAIN_COLOR)
     compression_ax.spines["left"].set_color(GAIN_COLOR)
-    compression_ax.spines["top"].set_visible(False)
+    house_style.finish(compression_ax)
 
     pae_ax = compression_ax.twinx()
     pae_ax.plot(input_drive_dbm, pae_pct, color=PAE_COLOR, lw=2)
@@ -131,26 +129,17 @@ def rf_after():
 
     small_signal_gain_db = pa_gain_db[:5].mean()
     p1db_index = int(np.argmin(np.abs(pa_gain_db - (small_signal_gain_db - 1.0))))
-    compression_ax.scatter(
-        [input_drive_dbm[p1db_index]], [pa_gain_db[p1db_index]], color=GAIN_COLOR, zorder=5
-    )
-    compression_ax.annotate(
+    house_style.mark(
+        compression_ax,
+        input_drive_dbm[p1db_index],
+        pa_gain_db[p1db_index],
         "P1dB",
-        xy=(input_drive_dbm[p1db_index], pa_gain_db[p1db_index]),
-        xytext=(6, -2),
-        textcoords="offset points",
-        fontsize=8,
+        dx=-14,
+        dy=18,
         color=GAIN_COLOR,
     )
 
-    fig.suptitle(
-        "DUT report — four measurements, one consistent sheet",
-        x=0.01,
-        ha="left",
-        fontsize=14,
-        weight="medium",
-    )
-    return _save(fig, "rf-after")
+    return _save(fig, "rf-after", tight=False)
 
 
 # ============================================================ a trend over time
@@ -168,24 +157,23 @@ def line_pair():
         ax.set_ylabel("passengers")
         _save(fig, "line-before")
 
-    house_style.apply_theme("executive")
-    fig, ax = plt.subplots(figsize=(6.6, 4.6))
-    ax.plot(year, passengers_per_year, color=ACCENT, lw=2.6)
-    house_style.polish(ax, grid="y")
-    house_style.thousands(ax, "y")
-    ax.margins(x=0.10)
-    ax.annotate(
-        f"{passengers_per_year[-1]:,.0f}",
-        (year[-1], passengers_per_year[-1]),
-        xytext=(8, 0),
-        textcoords="offset points",
-        va="center",
-        color=ACCENT,
-        fontsize=11,
-        weight="bold",
+    house_style.theme("glance")
+    fig, ax = house_style.page(
+        size=(6.6, 4.6),
+        kicker="Air travel · 1949–1960",
+        title="Air travel ~doubled across the 1950s",
+        dek="Passengers on international airlines, thousands per year.",
+        source="Source: Box & Jenkins airline series",
     )
-    ax.set_title("Air travel ~doubled across the 1950s", loc="left", pad=10)
-    _save(fig, "line-after")
+    ax.plot(year, passengers_per_year, color=ACCENT, lw=2.6)
+    house_style.finish(ax)
+    house_style.units(ax, "y", "count")
+    ax.margins(x=0.10)
+    house_style.mark(
+        ax, year[-1], passengers_per_year[-1],
+        f"{passengers_per_year[-1]:,.0f}", dx=8, dy=0, color=ACCENT,
+    )
+    _save(fig, "line-after", tight=False)
 
 
 # ============================================================ a matrix / seasonality
@@ -206,19 +194,24 @@ def heatmap_pair():
         fig.tight_layout()
         _save(fig, "heatmap-before")
 
-    house_style.apply_theme("detailed")
-    fig, ax = plt.subplots(figsize=(6.8, 4.8))
-    heatmap = ax.imshow(passenger_matrix, aspect="auto", cmap="viridis")
+    house_style.theme("study")
+    fig, ax = house_style.page(
+        size=(6.8, 4.8),
+        kicker="Air travel · 1949–1960",
+        title="Air travel peaks every summer — and the peaks keep growing",
+        dek="Passengers per month, by year (Cook's flights dataset).",
+        source="Source: Box & Jenkins airline series",
+    )
+    heatmap = ax.imshow(passenger_matrix, aspect="auto", cmap=house_style.SEQUENTIAL)
     ax.set_yticks(range(12))
     ax.set_yticklabels([month[:3] for month in MONTHS], fontsize=8)
     ax.set_xticks(range(0, len(years), 2))
     ax.set_xticklabels(years[::2], fontsize=8)
     ax.set_xlabel("year")
     ax.grid(False)
-    colorbar = house_style.add_colorbar(fig, heatmap, ax)
+    colorbar = fig.colorbar(heatmap, ax=ax, fraction=0.046, pad=0.04)
     colorbar.set_label("passengers / month")
-    ax.set_title("Air travel peaks every summer — and the peaks keep growing", loc="left", pad=10)
-    _save(fig, "heatmap-after")
+    _save(fig, "heatmap-after", tight=False)
 
 
 # ============================================================ the right chart for a change
@@ -253,19 +246,25 @@ def chart_choice_pair():
     life_exp_2007 = life_exp_2007[order_by_2007]
     row = np.arange(len(countries))
 
-    house_style.apply_theme("detailed")
-    fig, ax = plt.subplots(figsize=(6.8, 4.8))
+    house_style.theme("study")
+    fig, ax = house_style.page(
+        size=(6.8, 4.8),
+        margin_left=0.95,
+        kicker="Gapminder · life expectancy",
+        title="Life expectancy, 1952 → 2007 — the line is the gain",
+        dek="<1952> vs <2007>, years, for the six most populous countries.",
+        dek_highlights=[{"color": CONTEXT}, {"color": ACCENT}],
+        source="Source: Gapminder",
+    )
     for row_y, start, end in zip(row, life_exp_1952, life_exp_2007):
-        ax.plot([start, end], [row_y, row_y], color="#cfcfcf", lw=2.5, zorder=1)
-    ax.scatter(life_exp_1952, row, color=GREY, s=55, zorder=2, label="1952")
-    ax.scatter(life_exp_2007, row, color=ACCENT, s=70, zorder=3, label="2007")
+        ax.plot([start, end], [row_y, row_y], color=CONTEXT, lw=2.5, zorder=1, alpha=0.6)
+    ax.scatter(life_exp_1952, row, color=CONTEXT, s=55, zorder=2)
+    ax.scatter(life_exp_2007, row, color=ACCENT, s=70, zorder=3)
     ax.set_yticks(row)
     ax.set_yticklabels(countries, fontsize=10)
     ax.set_xlabel("life expectancy (years)")
-    ax.legend(loc="lower right", fontsize=9)
-    house_style.polish(ax, grid="x")
-    ax.set_title(r"Life expectancy, 1952 $\rightarrow$ 2007 — the line is the gain", loc="left", pad=10)
-    _save(fig, "chartchoice-after")
+    house_style.finish(ax, grid="x")
+    _save(fig, "chartchoice-after", tight=False)
 
 
 if __name__ == "__main__":
