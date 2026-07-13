@@ -51,9 +51,10 @@ future agent can produce the same quality with zero re-explanation.
 
 ::: {.callout-tip}
 ## How to read the code
-Every figure obeys the house rules: the object-oriented (OO) API, `apply_theme()` first, a title that
-states the *takeaway*, trimmed spines, and unit-aware ticks. The **only** exception is a counterexample
-that is explicitly labelled "the look we're escaping" — those keep matplotlib's raw defaults on purpose.
+Every figure obeys the house rules: the object-oriented (OO) API, `house_style.theme()` first, a title
+that states the *takeaway*, a bounded/finished axes, and unit-aware ticks. The **only** exception is a
+counterexample that is explicitly labelled "the look we're escaping" — those keep matplotlib's raw
+defaults on purpose.
 :::
 
 ```{python}
@@ -62,15 +63,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, MaxNLocator
 import house_style
+from house_style import ACCENT, CONTEXT as GREY
 
-# Rule 0, applied once: the theme is the first plotting line.
-house_style.apply_theme("detailed")
+# Rule 0, applied once: the theme is the first plotting line. The register (here
+# "study") sets the type scale and density for everything that follows in this cell.
+house_style.theme("study")
 
 # Grey-for-context + one accent is our DEFAULT for single-message charts — not a
-# mandate. Where several series genuinely need telling apart, reach for a fuller
-# (principled, non-rainbow) palette. The house accent is #6400FF.
-GREY = "#9e9e9e"
-ACCENT = "#6400FF"
+# mandate. Where several series genuinely need telling apart, reach for the fuller
+# validated SERIES palette. The house accent is #6400FF.
+
+
+def title(ax, msg, fontsize=13, **kw):
+    """A quick takeaway title for a bare `plt.subplots()` axes — the small-multiple
+    and lesson-panel case. `house_style.page()` is the full anatomy (M3+)."""
+    return ax.set_title(msg, loc="left", family=house_style.DISPLAY_STACK, weight=600,
+                         color=house_style.INK, fontsize=fontsize, **kw)
 ```
 
 ```{python}
@@ -106,7 +114,7 @@ ax.plot(x, y)              # operate on the OBJECT, not on hidden global state
 ## Extract — the OO-API rule
 Always `fig, ax = plt.subplots(constrained_layout=True)`. After that, **no `plt.*` plotting calls** —
 operate on `ax`/`fig`. The only `plt.*` you keep are `plt.subplots` itself and `plt.style.*`
-(both wrapped by `house_style.apply_theme`).
+(both wrapped by `house_style.theme`).
 :::
 
 ## The look we're escaping
@@ -121,7 +129,7 @@ a y-axis in bare thousands, and a title that just names the variable.
 months = np.arange(1, 13)
 revenue = np.array([41, 38, 46, 52, 55, 61, 68, 64, 59, 50, 47, 44]) * 1000
 
-# A counterexample: defaults ON PURPOSE (note: no apply_theme, raw style context).
+# A counterexample: defaults ON PURPOSE (note: no house_style.theme, raw style context).
 with plt.style.context("default"):
     fig, ax = plt.subplots()
     ax.plot(months, revenue, marker="o")
@@ -148,9 +156,9 @@ fig, ax = plt.subplots(constrained_layout=True)
 ax.plot(months, revenue, color=GREY, lw=2)  # the monthly series = context, in grey
 ax.plot(months[peak_month_index], revenue[peak_month_index], "o", color=ACCENT, ms=9, zorder=5)
 
-house_style.takeaway_title(ax, f"Revenue peaked in {month_names[peak_month_index]}, then cooled into year-end")
-house_style.despine(ax)  # drop top/right, offset the rest
-house_style.thousands(ax, "y")  # 68000 -> 68,000
+title(ax, f"Revenue peaked in {month_names[peak_month_index]}, then cooled into year-end")
+house_style.finish(ax)  # tick budget, hairline grid, bounded bottom spine
+house_style.units(ax, "y", "count")  # 68000 -> 68,000
 
 ax.set_xticks(months)
 ax.set_xticklabels(month_names)
@@ -257,9 +265,9 @@ for ax, y_scale in zip(axes, [1, 1000]):
 ## Before & after — the same series, raw vs. house
 
 Everything in M0 in one comparison, on real data: the classic airline-passengers series (1949–1960), drawn
-first with matplotlib's untouched defaults, then rebuilt on the OO API under `apply_theme`. The defaults and
-the house theme are *different rcParams*, so this has to be **two figures** — you can't put a truly raw axes
-beside a themed one in a single canvas, because the theme is global.
+first with matplotlib's untouched defaults, then rebuilt on the OO API under `house_style.theme`. The
+defaults and the house theme are *different rcParams*, so this has to be **two figures** — you can't put a
+truly raw axes beside a themed one in a single canvas, because the theme is global.
 
 ```{python}
 #| label: m0-capstone-before
@@ -270,7 +278,7 @@ decimal_year = flights["year"] + month_index / 12
 chronological = np.argsort(decimal_year)
 decimal_year, passengers = decimal_year[chronological], flights["passengers"][chronological]
 
-with plt.style.context("default"):  # the only honest way to show raw defaults post-apply_theme
+with plt.style.context("default"):  # the only honest way to show raw defaults post-theme
     fig, ax = plt.subplots()
     ax.plot(decimal_year, passengers)
     ax.set_title("Passengers")
@@ -280,7 +288,7 @@ with plt.style.context("default"):  # the only honest way to show raw defaults p
 
 ```{python}
 #| label: m0-capstone-after
-#| fig-cap: "After — the OO API under apply_theme: grey for context, the accent on the trend, a takeaway title, trimmed spines."
+#| fig-cap: "After — the OO API under house_style.theme: grey for context, the accent on the trend, a takeaway title, a finished axes."
 fig, ax = plt.subplots(constrained_layout=True)
 ax.plot(decimal_year, passengers, color=GREY, lw=1.1)  # the monthly series = context
 
@@ -288,10 +296,8 @@ twelve_month_trend = rolling_mean(passengers, 12)  # the point: the 12-month tre
 ax.plot(decimal_year, twelve_month_trend, color=ACCENT, lw=2.6)
 
 growth_multiple = passengers.max() / passengers.min()  # compute the multiple, don't guess it
-house_style.despine(ax)
-house_style.takeaway_title(
-    ax, f"US air travel roughly {growth_multiple:.0f}×'d in a decade — and the summer peaks grew with it"
-)
+house_style.finish(ax)
+title(ax, f"US air travel roughly {growth_multiple:.0f}×'d in a decade — and the summer peaks grew with it")
 ax.set_xlabel("Year")
 trend_label = ax.annotate(
     "12-month average",
@@ -332,7 +338,8 @@ hardest lessons by doing each the wrong way first, on the project's real dataset
 ::: {.callout-note}
 ## The pre-flight checklist (the condensed version)
 1. **Message** — the one sentence the figure must land. (It becomes the title.)
-2. **Audience & medium** — slide/poster → `executive`; report → `detailed`.
+2. **Audience & medium — pick the register** — slide/poster → `glance`; report/README → `read`;
+   appendix/datasheet → `study`.
 3. **Data shape** — how many variables, each one's *type* (quantitative / categorical / temporal / geographic),
    how many rows & categories.
 4. **Task — the verb** — comparison · ranking · distribution · relationship · part-to-whole · evolution ·
@@ -536,8 +543,8 @@ _, mean_mass = group(penguins["species"], penguins["body_mass_g"], np.nanmean, o
 bar_ax.bar(species, mean_mass, color=GREY)
 bar_ax.set_ylabel("Mean body mass (g)")
 bar_ax.set_title("Bar of means — no relationship in sight", loc="left", fontsize=11)
-house_style.despine(bar_ax)
-house_style.thousands(bar_ax, "y")
+house_style.finish(bar_ax)
+house_style.units(bar_ax, "y", "count")
 
 # AFTER — scatter by species: the relationship and the clusters both appear.
 for species_name in species:
@@ -549,8 +556,8 @@ for species_name in species:
 scatter_ax.set_xlabel("Flipper length (mm)")
 scatter_ax.set_ylabel("Body mass (g)")
 scatter_ax.set_title("Scatter by species — mass climbs with flipper length", loc="left", fontsize=11)
-house_style.despine(scatter_ax)
-house_style.thousands(scatter_ax, "y")
+house_style.finish(scatter_ax)
+house_style.units(scatter_ax, "y", "count")
 scatter_ax.legend(frameon=False, fontsize=8, loc="upper left")
 
 fig.suptitle(
@@ -616,14 +623,14 @@ scatter_ax.set_xscale("log")
 scatter_ax.set_xlabel("GDP per capita (log scale, $)")
 scatter_ax.set_ylabel("Life expectancy (years)")
 scatter_ax.set_title(r"Wealth vs. health, 2007 — bubble area $\propto$ population", loc="left", fontsize=11)
-house_style.despine(scatter_ax)
+house_style.finish(scatter_ax)
 scatter_ax.legend(frameon=False, fontsize=7, loc="lower right", ncol=2)
 
 # B — context: the distribution of the y variable.
 distribution_ax = mosaic["B"]
 distribution_ax.hist(gapminder_2007["lifeExp"], bins=12, color=GREY)
 distribution_ax.set_title("Distribution", loc="left", fontsize=10)
-house_style.despine(distribution_ax)
+house_style.finish(distribution_ax)
 
 # C — context: median by continent, the SAME colour key as the scatter.
 median_ax = mosaic["C"]
@@ -635,7 +642,7 @@ median_ax.barh(range(len(median_life_exp)), median_life_exp, color=median_color)
 median_ax.set_yticks(range(len(median_life_exp)))
 median_ax.set_yticklabels(continent, fontsize=8)
 median_ax.set_title("Median, by continent", loc="left", fontsize=10)
-house_style.despine(median_ax)
+house_style.finish(median_ax)
 
 source = fig.text(0.0, -0.02, "Data: Gapminder, 2007.", fontsize=8, color="#8a8a8a")
 ```
@@ -669,7 +676,7 @@ ax.indicate_inset_zoom(inset_ax, edgecolor="#999999")
 ax.set_xlabel("Frequency (GHz)")
 ax.set_ylabel(r"$S_{21}$ (dB)")
 ax.set_title(r"Ring-slot transmission $S_{21}$, 75–110 GHz", loc="left", fontsize=11)
-house_style.despine(ax)
+house_style.finish(ax)
 source = fig.text(
     0.0, -0.02, r"Data: scikit-rf measured ring-slot 2-port ($S_{21}$ magnitude).", fontsize=8, color="#8a8a8a"
 )
@@ -694,7 +701,7 @@ for country_name in np.unique(gapminder["country"]):
 ax.set_xlabel("Year")
 ax.set_ylabel("Life expectancy (years)")
 ax.set_title("All countries, one axes — spaghetti", loc="left", fontsize=11)
-house_style.despine(ax)
+house_style.finish(ax)
 note = fig.text(0.0, -0.02, "Data: Gapminder, 1952–2007.", fontsize=8, color="#8a8a8a")
 ```
 
@@ -719,7 +726,7 @@ for ax, continent_name in zip(axes, continents):
     ax.plot(year, median_life_exp, color=ACCENT, lw=2.4)
     ax.set_title(continent_name, loc="left", fontsize=11)
     ax.set_xticks([1952, 2007])
-    house_style.despine(ax)
+    house_style.finish(ax)
 axes[0].set_ylabel("Life expectancy (years)")
 fig.suptitle(
     "Small multiples — the median in accent, a shared y-axis: the comparison the spaghetti hid",
@@ -742,33 +749,21 @@ source = fig.text(
 4. **Zoom with an inset** (`ax.inset_axes` + `ax.indicate_inset_zoom`) to keep overview and detail together.
 :::
 
-# M3 — Typography: the title carries the legend
+# M3 — Typography: the page carries the legend
 
 Type is half of what makes a chart read as *professional*, and most of that is decisions, not fonts. The
-single highest-leverage move: the **title states the takeaway**, and the series words inside it are
-**colour-keyed** to the data — so the legend dissolves into the sentence and the reader's eye never leaves the
-plot to decode a key. `house_style.takeaway_title(ax, message, highlight=[...])` does exactly this, wrapping
-`highlight_text` so `<bracketed>` words take the series colours.
+single highest-leverage move: the **title states the takeaway**, and the series names live in the **dek** —
+the standfirst under the title — **colour-keyed** to the data, so the legend dissolves into a sentence and
+the reader's eye never leaves the plot to decode a key. `house_style.page(kicker=, title=, dek=,
+dek_highlights=[...])` does exactly this: `<bracketed>` words in the dek take the series colours (wrapping
+`highlight_text`), while the title stays plain — a sentence with a verb, never the axis names.
 
-## The legend, dissolved into the sentence
+## The legend, dissolved into the dek
 
 ```{python}
 #| label: m3-keyed
-#| fig-cap: "Each country's name is coloured to its line — no legend box, no round-trip for the eye."
+#| fig-cap: "Each country's name is coloured to its line in the dek — no legend box, no round-trip for the eye."
 series_color = {"China": ACCENT, "Brazil": "#1AA7A0"}
-
-fig, ax = plt.subplots(figsize=(8, 4.4), constrained_layout=True)
-for country_name in series_color:
-    in_country = gapminder["country"] == country_name
-    by_year = np.argsort(gapminder["year"][in_country])
-    ax.plot(
-        gapminder["year"][in_country][by_year],
-        gapminder["lifeExp"][in_country][by_year],
-        color=series_color[country_name], lw=2.6,
-    )
-house_style.despine(ax)
-ax.set_xlabel("Year")
-ax.set_ylabel("Life expectancy (years)")
 
 
 def life_exp_in(country, year):
@@ -777,60 +772,77 @@ def life_exp_in(country, year):
 
 years_behind_in_1952 = life_exp_in("Brazil", 1952) - life_exp_in("China", 1952)  # compute it, don't guess
 
-house_style.takeaway_title(
-    ax, f"<China> began {years_behind_in_1952:.0f} years behind <Brazil> — and caught it by 2007",
-    highlight=[
+house_style.theme("read")
+fig, ax = house_style.page(
+    kicker="Gapminder · life expectancy",
+    title="China caught up to Brazil within a generation",
+    dek=f"<China> began {years_behind_in_1952:.0f} years behind <Brazil> in 1952 — and caught it by 2007.",
+    dek_highlights=[
         {"color": series_color["China"], "weight": "bold"},
         {"color": series_color["Brazil"], "weight": "bold"},
     ],
+    source="Source: Gapminder, 1952–2007.",
 )
-source = fig.text(0.0, -0.02, "Data: Gapminder, 1952–2007.", fontsize=8, color="#8a8a8a")
+for country_name in series_color:
+    in_country = gapminder["country"] == country_name
+    by_year = np.argsort(gapminder["year"][in_country])
+    ax.plot(
+        gapminder["year"][in_country][by_year],
+        gapminder["lifeExp"][in_country][by_year],
+        color=series_color[country_name], lw=2.6,
+    )
+house_style.finish(ax)
+ax.set_ylabel("Life expectancy (years)")
 ```
 
-## Before & after — a title that renames the axis vs. one that carries the point
+## Before & after — a title that renames the axis vs. a page that carries the point
 
-Same histogram, same colours, same font — only the *typographic decisions* change. The left panel spends a
-title renaming the x-axis and parks a legend in the corner; the right panel puts the message in the title and
-keys the species into the words.
+Same histogram, same colours, same font — only the *typographic decisions* change. The before figure spends a
+title renaming the x-axis and parks a legend in the corner; the after figure puts the finding in the title and
+keys the species into the dek.
 
 ```{python}
-#| label: m3-capstone
-#| fig-cap: "Typography is decisions, not fonts: the takeaway title + colour-keyed words replace a redundant title and a legend box."
+#| label: m3-capstone-before
+#| fig-cap: "Before — a title that renames the axis, a boxed legend in the corner."
 adelie_mass = penguins["body_mass_g"][penguins["species"] == "Adelie"]
 gentoo_mass = penguins["body_mass_g"][penguins["species"] == "Gentoo"]
 pct_heavier = round(100 * (np.nanmean(gentoo_mass) / np.nanmean(adelie_mass) - 1))
 adelie_color, gentoo_color = ACCENT, "#1AA7A0"
 
-fig, (before_ax, after_ax) = plt.subplots(1, 2, figsize=(11, 4.4), constrained_layout=True, sharey=True)
-for ax in (before_ax, after_ax):
-    ax.hist(adelie_mass, bins=14, color=adelie_color, alpha=0.6, label="Adelie")
-    ax.hist(gentoo_mass, bins=14, color=gentoo_color, alpha=0.6, label="Gentoo")
-    house_style.despine(ax)
-    house_style.thousands(ax, "x")
-    ax.set_xlabel("Body mass (g)")
+fig, ax = plt.subplots(figsize=(6.6, 4.4), constrained_layout=True)
+ax.hist(adelie_mass, bins=14, color=adelie_color, alpha=0.6, label="Adelie")
+ax.hist(gentoo_mass, bins=14, color=gentoo_color, alpha=0.6, label="Gentoo")
+house_style.finish(ax)
+house_style.units(ax, "x", "count")
+ax.set_xlabel("Body mass (g)")
+ax.set_title("Body mass (g)")
+ax.set_ylabel("Count")
+ax.legend(loc="upper right", frameon=True, fontsize=9)
+```
 
-# BEFORE — typography doing no work: a title that renames the axis, a boxed legend in the corner.
-before_ax.set_title("Body mass (g)")
-before_ax.set_ylabel("Count")
-before_ax.legend(loc="upper right", frameon=True, fontsize=9)
-
-# AFTER — the takeaway title carries the key; the legend is gone.
-house_style.takeaway_title(
-    after_ax, f"<Gentoo> outweigh <Adelie> by about {pct_heavier}%",
-    highlight=[{"color": gentoo_color, "weight": "bold"}, {"color": adelie_color, "weight": "bold"}],
+```{python}
+#| label: m3-capstone-after
+#| fig-cap: "After — the finding is the title; the dek carries the key. The legend is gone."
+fig, ax = house_style.page(
+    size=(6.6, 4.4),
+    kicker="Palmer penguins · body mass",
+    title=f"Gentoo outweigh Adelie by about {pct_heavier}%",
+    dek=f"Body mass, g. <Gentoo> vs <Adelie> (n={len(gentoo_mass)}, {len(adelie_mass)}).",
+    dek_highlights=[{"color": gentoo_color, "weight": "bold"}, {"color": adelie_color, "weight": "bold"}],
+    source="Source: Palmer penguins.",
 )
-
-source = fig.text(
-    0.0, -0.02, f"Data: Palmer penguins (Adelie n={len(adelie_mass)}, Gentoo n={len(gentoo_mass)}).",
-    fontsize=8, color="#8a8a8a",
-)
+ax.hist(adelie_mass, bins=14, color=adelie_color, alpha=0.6)
+ax.hist(gentoo_mass, bins=14, color=gentoo_color, alpha=0.6)
+house_style.finish(ax)
+house_style.units(ax, "x", "count")
+ax.set_ylabel("Count")
 ```
 
 ::: {.callout-important}
 ## Extract — M3 rules
 1. **The title states the takeaway**, never the axis name.
-2. **Colour-key the series words into the title** with `takeaway_title(ax, msg, highlight=[...])` — a coloured
-   word in the sentence beats a legend box every time.
+2. **Colour-key the series words into the dek** with `house_style.page(dek=, dek_highlights=[...])` — a
+   coloured word in the sentence beats a legend box every time.
 3. **Type is hierarchy.** One clear weight/size step from title → labels → annotations; let the message sit at
    the top of it.
 :::
@@ -839,7 +851,7 @@ source = fig.text(
 
 Colour has three jobs, one per kind of data, and the cardinal error is using the wrong **type**:
 
-- **Categorical** — distinct hues for *unordered* groups (`house_style.CATEGORICAL`, accent-led).
+- **Categorical** — distinct hues for *unordered* groups (`house_style.SERIES`, violet-led, CVD-validated).
 - **Sequential** — one perceptually-uniform ramp for *ordered* magnitude (**viridis**, never jet/rainbow).
 - **Diverging** — two hues around a *meaningful midpoint* for *signed* data (`house_style.diverging_norm`,
   a symmetric `TwoSlopeNorm` so neither side is exaggerated).
@@ -864,7 +876,7 @@ fig, axes = plt.subplots(1, 3, figsize=(12, 3.6), constrained_layout=True, share
 bar_edge = dict(edgecolor="#bbbbbb", linewidth=0.6)  # keeps near-white diverging bars visible
 
 # categorical — distinct hues just NAME the groups
-axes[0].barh(row, median_life_exp, color=house_style.CATEGORICAL[: len(median_life_exp)], **bar_edge)
+axes[0].barh(row, median_life_exp, color=house_style.SERIES[: len(median_life_exp)], **bar_edge)
 axes[0].set_title("Categorical — names the groups", loc="left", fontsize=11)
 
 # sequential — a perceptually-uniform ramp ties colour to magnitude
@@ -881,7 +893,7 @@ axes[2].set_title("Diverging — deviation from the mean", loc="left", fontsize=
 for ax in axes:
     ax.set_yticks(row)
     ax.set_yticklabels(continent, fontsize=8)
-    house_style.despine(ax)
+    house_style.finish(ax, grid="x")
 fig.suptitle(
     "Match the palette TYPE to the question — name, magnitude, or deviation",
     x=0.01, ha="left", fontsize=13, weight="medium",
@@ -915,10 +927,8 @@ ax.set_xticks(range(len(years)))
 ax.set_xticklabels(years, fontsize=8, rotation=45)
 ax.set_xlabel("Year")
 ax.grid(False)  # no gridlines bleeding over the heatmap cells
-house_style.takeaway_title(
-    ax, "Air travel runs hot in summer, cold in winter — and the swing widens over the decade"
-)
-colorbar = house_style.add_colorbar(fig, heatmap, ax)
+title(ax, "Air travel runs hot in summer, cold in winter — and the swing widens over the decade")
+colorbar = fig.colorbar(heatmap, ax=ax, fraction=0.046, pad=0.04)
 colorbar.set_label("Passengers vs. that year's average")
 source = fig.text(0.0, -0.04, "Data: classic airline passengers, 1949–1960.", fontsize=8, color="#8a8a8a")
 ```
@@ -934,11 +944,11 @@ fig, (jet_ax, viridis_ax) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_la
 
 jet_image = jet_ax.imshow(passenger_matrix, aspect="auto", cmap="jet")
 jet_ax.set_title("jet — false boundaries, not uniform", loc="left", fontsize=11)
-house_style.add_colorbar(fig, jet_image, jet_ax)
+fig.colorbar(jet_image, ax=jet_ax, fraction=0.046, pad=0.04)
 
 viridis_image = viridis_ax.imshow(passenger_matrix, aspect="auto", cmap="viridis")
 viridis_ax.set_title("viridis — one honest, uniform ramp", loc="left", fontsize=11)
-house_style.add_colorbar(fig, viridis_image, viridis_ax)
+fig.colorbar(viridis_image, ax=viridis_ax, fraction=0.046, pad=0.04)
 
 for ax in (jet_ax, viridis_ax):
     ax.set_yticks(range(len(MONTHS)))
@@ -958,8 +968,9 @@ source = fig.text(
 
 ::: {.callout-important}
 ## Extract — M4 rules
-1. **Palette type follows the data:** categorical (`house_style.CATEGORICAL`) for groups, sequential
-   (**viridis**) for magnitude, diverging (`house_style.diverging_norm`, centred) for signed values.
+1. **Palette type follows the data:** categorical (`house_style.SERIES`) for groups, sequential
+   (**viridis** or `house_style.SEQUENTIAL`) for magnitude, diverging (`house_style.diverging_norm`, centred,
+   with `house_style.DIVERGING`) for signed values.
 2. **Never rainbow/jet** for sequential data — it fabricates boundaries and isn't perceptually uniform.
 3. **Centre diverging maps at the meaningful midpoint**, symmetric, so neither direction is exaggerated.
 :::
@@ -969,14 +980,15 @@ source = fig.text(
 **Principle.** Tufte's *data-ink ratio*: every drop of ink should carry information. Most "this looks like a
 default" charts aren't badly chosen — they're just unpolished: spines flush at the corner, a dozen ticks
 where four would do, a grid sitting *on top* of the data, a legend box for a single series. The fix is an
-**ordered pass**, and `house_style.polish(ax)` is that pass in one call. Both panels below already wear the
-house theme — what changes is only the data-ink.
+**ordered pass**, and `house_style.finish(ax)` is that pass in one call: a value-axis tick budget, a hairline
+grid behind the data, no y tick marks, and a bottom rule bounded to the data. Both panels below already wear
+the house theme — what changes is only the data-ink.
 
 ## The pass on a line
 
 ```{python}
 #| label: m5-polish-line
-#| fig-cap: "Both panels are house-themed; only the polish pass differs — offset spines, fewer ticks, and a direct end-label instead of a boxed legend."
+#| fig-cap: "Both panels are house-themed; only the polish pass differs — a bounded axis, fewer ticks, and a direct end-label instead of a boxed legend."
 flights = load("flights")
 year, passengers_per_year = group(flights["year"], flights["passengers"].astype(float), np.nansum)
 
@@ -989,10 +1001,11 @@ unpolished_ax.set_xlabel("Year")
 unpolished_ax.set_ylabel("Passengers per year")
 unpolished_ax.legend(loc="upper left", frameon=True, fontsize=9)
 
-# AFTER — one polish() call does the ordered pass; then label the line directly.
+# AFTER — one finish() call does the ordered pass; then label the line directly.
 polished_ax.plot(year, passengers_per_year, color=ACCENT, lw=2.4)
-house_style.polish(polished_ax, grid="y", margins={"x": 0.02})
-house_style.thousands(polished_ax, "y")
+polished_ax.margins(x=0.02)
+house_style.finish(polished_ax, grid="y")
+house_style.units(polished_ax, "y", "count")
 polished_ax.set_title("Polished — the matplotlib tell is gone", loc="left", fontsize=11)
 polished_ax.set_xlabel("Year")
 
@@ -1042,7 +1055,7 @@ default_ax.tick_params(axis="x", rotation=45)
 bar_position = np.arange(len(continent))
 bars = polished_ax.barh(bar_position, median_life_expectancy, color=GREY)
 bars[-1].set_color(ACCENT)
-house_style.polish(polished_ax, grid="x")
+house_style.finish(polished_ax, grid="x")
 polished_ax.set_yticks(bar_position)
 polished_ax.set_yticklabels(continent)
 polished_ax.set_xlabel("Median life expectancy (years)")
@@ -1067,81 +1080,83 @@ source = fig.text(
 ## Extract — M5 rules
 1. **Run the polish pass in order:** trim + offset the spines → fewer, rounder ticks (`MaxNLocator` on the
    *value* axis) → grid *behind* the data (`set_axisbelow(True)`) → deliberate margins.
-2. **`house_style.polish(ax, grid="y"|"x")` is the one-call lever.** Name the value axis so the categorical
+2. **`house_style.finish(ax, grid="y"|"x")` is the one-call lever.** Name the value axis so the categorical
    axis keeps its positions (bars don't get relocated by a numeric locator).
 3. **Direct labels beat axes and legends when they fit** — the value on the bar, the number at the end of the
    line; the eye never detours to decode a key.
 :::
 
-# M6 — House style: one theme, reused
+# M6 — House style: one theme, three registers
 
 **Principle.** A theme is what makes a deck look like one author wrote it. The house style lives in
-`minerva.mplstyle` (the rcParams) and `house_style.apply_theme()` (the one line every figure opens with).
-`apply_theme` takes a **mode**: `"executive"` strips a chart down for a slide, `"detailed"` gives it grid and
-room for an appendix. The two figures below run the **same plotting function** — only the mode argument
-changes.
+`minerva.mplstyle` (the rcParams) and `house_style.theme()` (the one line every figure opens with).
+`theme` takes a **register** — the reading contract from `VISUALIZATION_GUIDE.md`: `"glance"` strips a
+chart down for a slide (~3 s, across a room), `"read"` is the report/README default (~30 s, arm's length),
+`"study"` gives it a denser tick budget and room for an appendix (minutes, leaning in). The two figures below
+run the **same plotting function** — only the register argument changes.
 
-## Before & after — one theme, two modes
+## Before & after — one theme, two registers
 
 ```{python}
-#| label: m6-executive
-#| fig-cap: "mode='executive' — no grid, a larger title, a wide slide aspect. The plotting body is identical to the next figure."
+#| label: m6-glance
+#| fig-cap: "register='glance' — a wide slide aspect, a larger title, a slim tick budget. The plotting body is identical to the next figure."
 def plot_passengers_by_year(ax):
-    """The plotting body, themed by whichever mode is active when it runs."""
+    """The plotting body, themed by whichever register is active when it runs."""
     flights = load("flights")
     year, passengers_per_year = group(flights["year"], flights["passengers"].astype(float), np.nansum)
     ax.plot(year, passengers_per_year, color=ACCENT, lw=2.6)
-    house_style.despine(ax)
-    house_style.thousands(ax, "y")
+    house_style.finish(ax)
+    house_style.units(ax, "y", "count")
     ax.set_xlabel("Year")
     ax.set_ylabel("Passengers per year")
 
 
-house_style.apply_theme("executive")
+house_style.theme("glance")
 fig, ax = plt.subplots(constrained_layout=True)
 plot_passengers_by_year(ax)
-house_style.takeaway_title(ax, "Air travel climbed every year of the 1950s")
+title(ax, "Air travel climbed every year of the 1950s")
 source = fig.text(0.0, -0.02, "Data: classic airline passengers, 1949–1960.", fontsize=8, color="#8a8a8a")
 ```
 
 ```{python}
-#| label: m6-detailed
-#| fig-cap: "Same plot_passengers_by_year() — only mode='detailed' changed: grid returns and the canvas gives an appendix room to breathe."
-house_style.apply_theme("detailed")
+#| label: m6-study
+#| fig-cap: "Same plot_passengers_by_year() — only register='study' changed: a denser tick budget and a canvas that gives an appendix room to breathe."
+house_style.theme("study")
 fig, ax = plt.subplots(constrained_layout=True)
 plot_passengers_by_year(ax)
-house_style.takeaway_title(ax, "Same code, mode='detailed' — grid and room for the footnotes")
+title(ax, "Same code, register='study' — denser ticks and room for the footnotes")
 source = fig.text(0.0, -0.02, "Data: classic airline passengers, 1949–1960.", fontsize=8, color="#8a8a8a")
 ```
 
 The lever is one argument; the look is wholesale. For a genuine *one-off* — a chart that needs a setting the
 theme doesn't have — reach for a **context manager** (`with plt.style.context(...)` or `plt.rc_context({...})`)
-so the deviation is scoped and the global theme is never disturbed. `house_style.save_all` (next module) uses
+so the deviation is scoped and the global theme is never disturbed. `house_style.save` (next module) uses
 exactly this pattern to set print-only font handling at save time without touching the on-screen look.
 
 ::: {.callout-important}
 ## Extract — M6 rules
-1. **`house_style.apply_theme()` is the first plotting line, every time.** `mode="executive"` for slides and
-   single-message charts; `mode="detailed"` for appendices and multi-panel figures.
+1. **`house_style.theme(register)` is the first plotting line, every time.** `"glance"` for slides and
+   single-message charts; `"read"` for reports/READMEs; `"study"` for appendices and multi-panel figures.
 2. **Define the look once, reuse it everywhere.** A shared theme — not per-chart hand-styling — is what makes
-   a set of figures read as one consistent house.
+   a set of figures read as one consistent house. One figure, one register — re-render for a different medium.
 3. **One-offs go in a context manager** (`plt.rc_context` / `plt.style.context`) so a local override never
    leaks into the global theme.
 :::
 
-# M7 — Composition capstone: executive vs. detailed, then export
+# M7 — Composition capstone: glance vs. study, then export
 
-**Principle.** One dataset earns **two figures**. The *executive* cut carries a single message on one accented
-series with the axes stripped to the point — built for a slide. The *detailed* cut is a multi-panel report,
+**Principle.** One dataset earns **two figures**. The *glance* cut carries a single message on one accented
+series with the axes stripped to the point — built for a slide. The *study* cut is a multi-panel datasheet,
 layering a second dataset and a secondary axis — built for the appendix. Then you **export right**: vector for
-print and slides, a 2× PNG for the web. Same DUT measurements throughout, two deliberate treatments.
+print and slides, a 2× PNG for the web. Same DUT measurements throughout, two deliberate treatments, each a
+full `page()` — kicker, title, dek, source.
 
-## The executive cut — one message, one series
+## The glance cut — one message, one series
 
 ```{python}
-#| label: m7-executive
-#| fig-cap: "Executive cut: one accented curve, axes stripped to the message, the two band edges labelled — then exported as SVG + PDF + 2x PNG."
-house_style.apply_theme("executive")
+#| label: m7-glance
+#| fig-cap: "glance cut: one accented curve on a full page anatomy, the two band edges labelled — then exported as SVG + PDF + 2x PNG."
+house_style.theme("glance")
 dut_report = load("rf_dut_report")
 frequency_ghz = dut_report["freq_ghz"]
 gain_db = dut_report["gain_db"]
@@ -1149,44 +1164,29 @@ gain_at_low_edge = gain_db[0]
 gain_at_high_edge = gain_db[-1]
 gain_rolloff_db = gain_at_low_edge - gain_at_high_edge
 
-fig, ax = plt.subplots(constrained_layout=True)
+fig, ax = house_style.page(
+    kicker="RF DUT report · S-parameters",
+    title=f"DUT gain rolls off {gain_rolloff_db:.1f} dB across the 1–6 GHz band",
+    dek="Gain, dB, vs. frequency, GHz.",
+    source="Source: synthesized DUT report (gain vs. frequency).",
+)
 ax.plot(frequency_ghz, gain_db, color=ACCENT, lw=2.8)
-house_style.despine(ax)
-ax.set_xlabel("Frequency (GHz)")
-ax.set_ylabel("Gain (dB)")
+house_style.finish(ax)
 ax.margins(x=0.02)
 
 # label each band edge, offset clear of the descending trace
-ax.annotate(
-    f"{gain_at_low_edge:.1f} dB",
-    xy=(frequency_ghz[0], gain_at_low_edge),
-    xytext=(6, 2),
-    textcoords="offset points",
-    ha="left",
-    color=ACCENT,
-    fontweight="bold",
-)
-ax.annotate(
-    f"{gain_at_high_edge:.1f} dB",
-    xy=(frequency_ghz[-1], gain_at_high_edge),
-    xytext=(0, -14),
-    textcoords="offset points",
-    ha="center",
-    color=ACCENT,
-    fontweight="bold",
-)
+house_style.mark(ax, frequency_ghz[0], gain_at_low_edge, f"{gain_at_low_edge:.1f} dB", dx=6, dy=8, color=ACCENT)
+house_style.mark(ax, frequency_ghz[-1], gain_at_high_edge, f"{gain_at_high_edge:.1f} dB", dx=-6, dy=-16, color=ACCENT)
 
-house_style.takeaway_title(ax, f"DUT gain rolls off {gain_rolloff_db:.1f} dB across the 1–6 GHz band")
-source = fig.text(0.0, -0.02, "Data: synthesized DUT report (gain vs. frequency).", fontsize=8, color="#8a8a8a")
-executive_exports = house_style.save_all(fig, "dut_executive")
+glance_exports = house_style.save(fig, "dut_glance")
 ```
 
-## The detailed cut — a multi-panel report with a twin axis
+## The study cut — a multi-panel datasheet with a twin axis
 
 ```{python}
-#| label: m7-detailed
-#| fig-cap: "Detailed cut: gain, noise figure and return loss over frequency, plus a PA compression panel whose twin axis is colour-keyed (dB to gain, % to PAE)."
-house_style.apply_theme("detailed")
+#| label: m7-study
+#| fig-cap: "study cut: gain, noise figure and return loss over frequency, plus a PA compression panel whose twin axis is colour-keyed (dB to gain, % to PAE)."
+house_style.theme("study")
 dut_report = load("rf_dut_report")
 frequency_ghz = dut_report["freq_ghz"]
 
@@ -1196,52 +1196,50 @@ pa_gain_db = power_amp["gain_db"]
 pae_pct = power_amp["pae_pct"]
 
 GAIN_COLOR = ACCENT
-PAE_COLOR = house_style.CATEGORICAL[1]  # teal — the second series' key
+PAE_COLOR = house_style.SERIES[1]  # emerald — the second series' key
 
-fig, panels = plt.subplot_mosaic("AB\nCD", figsize=(11, 6.4), constrained_layout=True)
+fig, panels = house_style.page(
+    size=(11, 6.6),
+    mosaic="AB\nCD",
+    kicker="RF DUT report · S-parameters & PA sweep",
+    title="Gain holds flat and return loss stays under spec across band",
+    dek="Four measurements, one consistent sheet.",
+    source="Source: synthesized DUT report + PA efficiency sweep.",
+)
 
 # A — gain over frequency (the headline parameter)
 gain_ax = panels["A"]
 gain_ax.plot(frequency_ghz, dut_report["gain_db"], color=GAIN_COLOR, lw=2)
-gain_ax.set_title("Gain", loc="left", fontsize=11)
+house_style.panel_title(gain_ax, "Gain")
 gain_ax.set_ylabel("Gain (dB)")
-house_style.despine(gain_ax)
+house_style.finish(gain_ax)
 
 # B — noise figure over frequency
 noise_figure_ax = panels["B"]
 noise_figure_ax.plot(frequency_ghz, dut_report["noise_figure_db"], color=GREY, lw=2)
-noise_figure_ax.set_title("Noise figure", loc="left", fontsize=11)
+house_style.panel_title(noise_figure_ax, "Noise figure")
 noise_figure_ax.set_ylabel("NF (dB)")
-house_style.despine(noise_figure_ax)
+house_style.finish(noise_figure_ax)
 
 # C — return loss over frequency, against the -10 dB match limit
 return_loss_ax = panels["C"]
 return_loss_ax.plot(frequency_ghz, dut_report["return_loss_db"], color=GREY, lw=2)
-return_loss_ax.axhline(-10, ls="--", lw=1, color=ACCENT)
-return_loss_ax.annotate(
-    "-10 dB match limit",
-    xy=(frequency_ghz[-1], -10),
-    xytext=(0, 4),
-    textcoords="offset points",
-    ha="right",
-    fontsize=8,
-    color=ACCENT,
-)
-return_loss_ax.set_title("Return loss", loc="left", fontsize=11)
+house_style.spec_band(return_loss_ax, -10, side="above", label="-10 dB match limit")
+house_style.panel_title(return_loss_ax, "Return loss")
 return_loss_ax.set_xlabel("Frequency (GHz)")
 return_loss_ax.set_ylabel(r"$S_{11}$ (dB)")
-house_style.despine(return_loss_ax)
+house_style.finish(return_loss_ax)
 
 # D — PA compression: gain (left, dB) and PAE (right, %) share a drive axis but not a scale,
 #     so each y-axis is colour-keyed to its own series — the only honest way to twin axes.
 compression_ax = panels["D"]
 compression_ax.plot(input_drive_dbm, pa_gain_db, color=GAIN_COLOR, lw=2)
-compression_ax.set_title("PA compression & efficiency", loc="left", fontsize=11)
+house_style.panel_title(compression_ax, "PA compression & efficiency")
 compression_ax.set_xlabel("Input drive (dBm)")
 compression_ax.set_ylabel("Gain (dB)", color=GAIN_COLOR)
 compression_ax.tick_params(axis="y", colors=GAIN_COLOR)
 compression_ax.spines["left"].set_color(GAIN_COLOR)
-compression_ax.spines["top"].set_visible(False)
+house_style.finish(compression_ax)
 
 pae_ax = compression_ax.twinx()
 pae_ax.plot(input_drive_dbm, pae_pct, color=PAE_COLOR, lw=2)
@@ -1252,39 +1250,28 @@ pae_ax.spines["top"].set_visible(False)
 
 small_signal_gain_db = pa_gain_db[:5].mean()
 p1db_index = int(np.argmin(np.abs(pa_gain_db - (small_signal_gain_db - 1.0))))
-compression_ax.scatter([input_drive_dbm[p1db_index]], [pa_gain_db[p1db_index]], color=GAIN_COLOR, zorder=5)
-compression_ax.annotate(
-    "P1dB",
-    xy=(input_drive_dbm[p1db_index], pa_gain_db[p1db_index]),
-    xytext=(6, -2),
-    textcoords="offset points",
-    fontsize=8,
-    color=GAIN_COLOR,
+house_style.mark(
+    compression_ax, input_drive_dbm[p1db_index], pa_gain_db[p1db_index], "P1dB",
+    dx=-14, dy=18, color=GAIN_COLOR,
 )
 
-fig.suptitle(
-    "DUT report — four measurements, one consistent sheet", x=0.01, ha="left", fontsize=13, weight="medium"
-)
-source = fig.text(
-    0.0, -0.02, "Data: synthesized DUT report + PA efficiency sweep.", fontsize=8, color="#8a8a8a"
-)
-detailed_exports = house_style.save_all(fig, "dut_detailed")
+study_exports = house_style.save(fig, "dut_study")
 ```
 
-Each `save_all` call wrote three files to `outputs/`: an **SVG** and a **PDF** (vector, for print and slides —
+Each `save` call wrote three files to `outputs/`: an **SVG** and a **PDF** (vector, for print and slides —
 the PDF embeds a font subset, the SVG draws text as paths so it renders anywhere) and a **PNG** at 2× dpi for
-the web. The look modes (`executive` / `detailed`) and the export are deliberately separate concerns:
-`save_all` sets its print-only font handling inside an `rc_context`, so saving never disturbs the on-screen
-theme.
+the web. The registers (`glance` / `study`) and the export are deliberately separate concerns: `save` sets its
+print-only font handling inside an `rc_context`, so saving never disturbs the on-screen theme, and — unlike
+`bbox_inches="tight"` — never shaves the page's deliberate margins.
 
 ::: {.callout-important}
 ## Extract — M7 rules
-1. **One dataset, two figures.** An executive cut (one message, one accent, axes stripped) for the slide; a
-   detailed cut (multi-panel, a layered second dataset, annotations) for the appendix. Choose by audience.
+1. **One dataset, two figures.** A glance cut (one message, one accent, axes stripped) for the slide; a study
+   cut (multi-panel datasheet, a layered second dataset, annotations) for the appendix. Choose by register.
 2. **Twin axes only when units truly differ** (dB vs. %), and then **colour-key each y-axis** — label, ticks,
    *and* spine — to its series. Never stretch one scale across unlike units.
-3. **Export every figure with `house_style.save_all`:** SVG + PDF (vector, fonts handled) for print and
-   slides, PNG at 2× dpi for web, all `bbox_inches="tight"`.
+3. **Export every figure with `house_style.save`:** SVG + PDF (vector, fonts handled) for print and slides,
+   PNG at 2× dpi for web — never `bbox_inches="tight"` on a `page()` figure.
 :::
 
 # The whole path, distilled {.unnumbered}
@@ -1297,11 +1284,11 @@ artifacts:
 | **M0** | hold handles, not global state | the OO-API rule |
 | **M1** | ask before you plot | `VISUALIZATION_GUIDE.md` (data shape × task → chart) |
 | **M2** | the figure is the master coordinate | `subplot_mosaic`, small multiples, insets |
-| **M3** | the title carries the legend | `takeaway_title(ax, msg, highlight=[...])` |
-| **M4** | match the palette *type* to the data | `CATEGORICAL`, viridis, `diverging_norm` |
-| **M5** | spend ink only on information | `polish(ax, grid=...)` |
-| **M6** | one theme, reused | `apply_theme(mode=...)` |
-| **M7** | one dataset, two figures, exported right | `save_all(fig, stem)` |
+| **M3** | the page carries the legend | `page(dek=, dek_highlights=[...])` |
+| **M4** | match the palette *type* to the data | `SERIES`, viridis, `diverging_norm` |
+| **M5** | spend ink only on information | `finish(ax, grid=...)` |
+| **M6** | one theme, three registers | `theme(register)` |
+| **M7** | one dataset, two figures, exported right | `save(fig, stem)` |
 
 The figures were always the byproduct. The deliverable is `CLAUDE.md` + `VISUALIZATION_GUIDE.md` +
 `house_style.py` — enough for any future agent to make a deliberate, defensible figure with zero

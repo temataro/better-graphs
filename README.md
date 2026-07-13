@@ -62,12 +62,14 @@ A short **course** plus a **reusable style kit**. The rules live in plain files 
 agent reads *before* it draws — so you (or your agent) get deliberate, presentation-ready
 figures without re-explaining good taste each time. Three files do the real work:
 
-- **[`CLAUDE.md`](CLAUDE.md)** — the operating manual: the workflow (choose the chart →
-  theme → takeaway title → polish → export) and the hard rules.
-- **[`VISUALIZATION_GUIDE.md`](VISUALIZATION_GUIDE.md)** — *which* chart to use: a checklist,
-  a *(data shape × task) → chart* lookup, and a catalog (when to use / when not).
+- **[`CLAUDE.md`](CLAUDE.md)** — the operating manual: the workflow (choose the chart → choose
+  the register → build the page → polish → export) and the hard rules.
+- **[`VISUALIZATION_GUIDE.md`](VISUALIZATION_GUIDE.md)** — *which* chart to use, *who* it's for
+  (the `glance`/`read`/`study` register), and *how hard to try* (the altitude ladder): a
+  checklist, a *(data shape × task) → chart* lookup, a catalog, and the page anatomy + colour
+  system.
 - **[`visualization-curriculum/house_style.py`](visualization-curriculum/house_style.py)** —
-  the one-import lever: `apply_theme()`, `polish()`, `takeaway_title()`, `save_all()`, and the
+  the one-import lever: `theme()`, `page()`, `finish()`, `save()`, and the CVD-validated,
   accent-led palette. One line turns a default chart into the "after" above.
 
 The course (`visualization-curriculum/better_graphs.qmd`, modules M0–M7) is the worked-example
@@ -94,9 +96,10 @@ Consult the Better Graphs design system first and follow its workflow + hard rul
 - Operating manual: https://raw.githubusercontent.com/temataro/better-work-graphs/main/CLAUDE.md
 - Chart-choice framework: https://raw.githubusercontent.com/temataro/better-work-graphs/main/VISUALIZATION_GUIDE.md
 - The lever module: https://raw.githubusercontent.com/temataro/better-work-graphs/main/visualization-curriculum/house_style.py
-State the chart type and WHY in one line before plotting. Use the matplotlib OO API,
-a takeaway title (not an axis-name title), an accent-led palette over grey (never jet),
-trimmed/offset spines, and unit-aware ticks. Ask for confirmation on dual-axis or pie.
+State the chart type and WHY in one line before plotting, and pick a register (glance/read/
+study). Use the matplotlib OO API, a page anatomy with a takeaway title and a source line (not
+an axis-name title), an accent-led palette over grey (never jet), and unit-aware ticks. Ask for
+confirmation on dual-axis or pie.
 ```
 
 **3. Project pointer.** One line in a repo's `CLAUDE.md`:
