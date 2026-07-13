@@ -9,11 +9,14 @@ produce charts**. The real deliverable is a reusable, self-contained instruction
 make professional, Tufte-grade matplotlib figures with zero re-explanation. The three durable artifacts are:
 
 - **`CLAUDE.md`** (this file) — the agent operating rules: workflow + hard rules.
-- **`VISUALIZATION_GUIDE.md`** — the chart-choice decision framework: the 10 rules, a pre-flight checklist, a
-  *(data shape × task) → chart* lookup, and a chart catalog (when to use / when not / the anti-pattern).
-- **`visualization-curriculum/house_style.py`** — the one-line lever agents call: `apply_theme()`, `despine()`,
-  `polish()`, `thousands()`, `add_colorbar()`, `outlined_text()`, `takeaway_title(highlight=…)`,
-  `diverging_norm()`, `save_all()`, the `CATEGORICAL`/`ACCENT`/`GREY` palette, and (eventually) chart builders.
+- **`VISUALIZATION_GUIDE.md`** — the full design framework: chart-choice (the 10 rules, a pre-flight checklist,
+  a *(data shape × task) → chart* lookup, a chart catalog), the reader **register** (`glance`/`read`/`study`),
+  the **altitude** ladder for how hard to try (A0 themed default → A1 composed → A2 bespoke, with the four-gate
+  test), the editorial page anatomy, and the computed (CVD-validated) colour system.
+- **`visualization-curriculum/house_style.py`** — the one-line lever agents call: `theme(register)`,
+  `page(kicker=, title=, dek=, source=)`, `finish()`, `units()`, `label_end()`, `mark()`, `spec_band()`,
+  `stat()`, `panel_title()`, `diverging_norm()`, `save()`, the validated `SERIES`/`ACCENT` palette plus
+  `SEQUENTIAL`/`DIVERGING` house colormaps, and (eventually) chart builders.
 
 Charts are byproducts; when you build one, the goal is to **extract the reusable rule** back into these three
 files. `PLAN.md` is the full module-by-module roadmap (M0–M7); read it before substantive work — each module
@@ -28,22 +31,28 @@ distilled back into the three durable artifacts. The environment is set up and w
 
 - `pyproject.toml` + uv-managed `.venv/` + `uv.lock` — the plotting stack is installed; git is initialized
   on `main`.
-- `visualization-curriculum/house_style.py` — the theme/helpers module. `apply_theme()` loads
-  `minerva.mplstyle` and is verified working (it previously pointed at a nonexistent `your_style.mplstyle`).
+- `visualization-curriculum/house_style.py` — the theme/helpers module: a figure is a small publication —
+  registers (`glance`/`read`/`study`) set the type scale and density, `page()` builds the kicker/title/dek/
+  source anatomy at inch-true margins, `finish()` polishes the axes. `theme()` loads `minerva.mplstyle`.
 - `visualization-curriculum/ndata.py` — numpy data layer (`load` → dict of arrays from `.npz`, plus
   `select`/`group`/`pivot`/`rolling_mean`/`corr`/`std`/`finite`). The curriculum uses this, not pandas.
-- `visualization-curriculum/minerva.mplstyle` — base rcParams; the default font is **League Spartan**.
+- `visualization-curriculum/minerva.mplstyle` — base rcParams: warm paper (`#FAF7F2`), warm ink, Junction as
+  the working-text font. The default typefaces are **League Spartan** (display) + **Junction** (body).
 - `visualization-curriculum/fonts/` — vendored League Spartan + Junction (The League of Movable Type, OFL).
   `house_style` registers them on import, so figures need no system font install.
+- `visualization-curriculum/check_palette.py` — the palette validator: simulates protanopia/deuteranopia/
+  tritanopia (Machado 2009), measures worst-pair ΔE, lightness band, chroma floor, and WCAG contrast against
+  the paper/white surface. Any palette change must pass it — colour is computed, not eyeballed.
 - `visualization-curriculum/better_graphs.qmd` — the curriculum source (Quarto → HTML); **M0–M7 written**.
   Its cells read `data/*.npz` via `ndata.load`, so build the datasets before rendering.
-- `VISUALIZATION_GUIDE.md` — the chart-choice decision framework (written in M1; see above).
+- `VISUALIZATION_GUIDE.md` — the full design framework (chart-choice, registers, altitude, anatomy, colour;
+  see above).
 - `data/` — `build_datasets.py` (downloads + synthesizes the datasets) and `data/README.md` (provenance);
   these two are tracked. The data they produce (`data/raw/`, `data/*.csv`, `data/*.npz`) is gitignored and
   regenerated on demand: `uv run python data/build_datasets.py`.
 - `PLAN.md`, `README.md`, `output.pdf` (a 9-page PDF reference, ~41 MB).
 
-- `outputs/` — exported figures (`house_style.save_all` writes `<stem>.{svg,pdf,png}` here). Gitignored and
+- `outputs/` — exported figures (`house_style.save()` writes `<stem>.{svg,pdf,png}` here). Gitignored and
   regenerated on render, like `data/` — the export *code* is the deliverable, not the binaries.
 
 Still planned but **not** present (per `PLAN.md`): the chart builders inside `house_style.py`
@@ -51,31 +60,58 @@ Still planned but **not** present (per `PLAN.md`): the chart builders inside `ho
 
 ## Charting rules (the operating manual)
 
+A figure is a small publication, not a printout of arrays: a headline, a standfirst, a body, and a source
+line, edited for a specific reader with a specific attention budget. Decluttering is the precondition, not the
+payoff — a shipped figure also needs an accent series and a plain-language annotation stating the conclusion
+(*focused* beats merely *decluttered*: Ajani, Xiong, Knaflic & Franconeri).
+
 ### Workflow (every time, in order)
-1. Answer the chart-choice checklist in `VISUALIZATION_GUIDE.md`. State the chart type and WHY in one line —
-   *"`<chart>` because `<shape>` + `<task>`."*
-2. `from house_style import apply_theme; apply_theme(mode=...)` as the first plotting line.
-   - mode='executive' → slides / one-message charts;  mode='detailed' → appendices / multi-panel.
-3. OO API: `fig, ax = plt.subplots(constrained_layout=True)`. No `plt.*` plotting calls after (only savefig).
-4. TITLE states the takeaway, not the axis names. Colour-key the series words into it:
-   `takeaway_title(ax, msg, highlight=[{"color": c1}, ...])` (wraps highlight_text) — a coloured word in the
-   sentence beats a legend box.
-5. Polish: `house_style.polish(ax, grid="y"|"x")` runs the ordered pass — offset/trim spines, `MaxNLocator`
-   on the value axis, grid behind the data, margins. Then unit-aware formatters + direct labels.
-6. Export with `house_style.save_all(fig, stem)`: vector (SVG+PDF) for print/slides AND PNG at 2× dpi for web,
-   all `bbox_inches='tight'`. Dense scatter/large N → rasterized=True with a high savefig dpi.
+1. Write the one-sentence finding, then answer the chart-choice checklist in `VISUALIZATION_GUIDE.md` and
+   state it — *"`<chart>` because `<shape>` + `<task>`."*
+2. Choose the **register** from the reader and say it — `glance` (a slide/poster, ~3 s), `read` (a report/
+   README, ~30 s), or `study` (an appendix/datasheet, minutes). `house_style.theme(register)` is the first
+   plotting line.
+3. Choose the **altitude** — A0 themed default (your own eyes only) → A1 composed catalog chart (**the
+   default for anything shared**) → A2 bespoke Artist drawing. A2 requires passing the four-gate test in
+   `VISUALIZATION_GUIDE.md` aloud.
+4. `fig, ax = house_style.page(kicker=…, title=…, dek=…, source=…)` — the title states the finding (a
+   sentence with a verb, never the axis names); units go in the dek; series names colour-key into the dek
+   (`dek_highlights=[{"color": c1}, ...]`) instead of a legend box.
+5. Draw with the OO API only after `page()` (only `savefig` after that). Accent the message series in
+   `house_style.ACCENT`/`SERIES`; demote context to `house_style.CONTEXT`/`SMOKE`.
+6. `house_style.finish(ax)` (+ `units(ax, "y", kind)` for the unit-on-top-tick), then spend the annotation
+   budget: `label_end()` for line-chart series (the legend, dissolved), `mark()` for the interpretive callout,
+   `spec_band()` for limits, `stat()` for datasheet hero-number tiles.
+7. Check yourself: where do the eyes land first? It must be the accented element. Would the figure survive
+   being copied out of its document (title + dek + source intact)?
+8. `house_style.save(fig, stem)` — SVG + PDF + 2× PNG. Never `bbox_inches="tight"` on a `page()` figure — the
+   margins are deliberate and tight-cropping shaves them asymmetrically.
 
 ### Hard rules
-- No pie beyond ~5 slices. No dual-y-axis unless units truly differ (label + color both axes).
-- No rainbow/jet. Match palette *type* to data: categorical → `house_style.CATEGORICAL` (accent-led);
-  sequential → viridis; diverging → `house_style.diverging_norm()` (symmetric, centred TwoSlopeNorm).
+- No rotated y-axis labels — units in the dek or `house_style.ylabel_above()`. No centred titles; one left
+  edge for the whole header stack (kicker/title/dek).
+- No legend boxes on line charts — `label_end()` direct labels or dek colour-keying.
+- No naked "decluttered" figures — every shared figure carries its interpretive layer (`mark()`, at least
+  one).
+- Bars start at zero, never broken. Bar-of-means never hides raw points at small n — show the points beside
+  the summary.
+- No pie beyond ~5 slices. No dual-y-axis unless units truly differ — and then align the zeros and colour-key
+  label + ticks + spine of *both* axes to their series; otherwise split into stacked shared-x panels (usually
+  better even then).
+- No rainbow/jet. Palette is computed, not eyeballed: categorical → `house_style.SERIES` (fixed order, violet
+  leads, never cycled — a 7th series is a design failure); sequential → `house_style.SEQUENTIAL` or viridis;
+  diverging → `house_style.diverging_norm()` (symmetric, centred) with `house_style.DIVERGING`. Any palette
+  change runs `visualization-curriculum/check_palette.py` (CVD ΔE ≥ 12, contrast ≥ 3:1).
 - Grey-for-context + one accent (`#6400FF`) is the *default* for a single-message chart — not a mandate.
-  Use a principled categorical/sequential palette when several series genuinely need distinguishing (never
+  Use the validated categorical/sequential palette when several series genuinely need distinguishing (never
   rainbow); don't force everything to monochrome. Thousands separators + unit-aware tick formatters always.
-- Colorbars sized to the axes: fraction=0.046, pad=0.04.
-- Size the figure first (it's the master coordinate); compose multi-panel with `subplot_mosaic` +
-  `constrained_layout`, sharing one colour encoding across panels. Many series → small multiples (one panel
-  per group, shared axes), never spaghetti. Zoom with an inset (`inset_axes` + `indicate_inset_zoom`).
+- League Spartan is display-only (≥10 pt, never tick labels or numeral columns — proportional figures jitter);
+  Junction carries the working text. Special glyphs (° → Ω) need `family=house_style.BODY_STACK` explicit.
+- Colorbars sized to the axes: `fraction=0.046, pad=0.04`.
+- Size the figure first (it's the master coordinate); compose multi-panel with `house_style.page(mosaic=…)`,
+  sharing one colour encoding across panels. Many series → small multiples (one panel per group, shared axes),
+  never spaghetti. Zoom with an inset (`inset_axes` + `indicate_inset_zoom`).
+- One figure, one register — re-render for a different medium, never reuse.
 
 ### Libraries / stack
 matplotlib (OO API), numpy, pypalettes (palettes), highlight-text (titles). **Curriculum data is numpy, not
