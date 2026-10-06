@@ -27,3 +27,6 @@ data/*.npz
 
 # OS
 .DS_Store
+
+# Explicitly scoped, self-contained review render (not a deployment).
+!/reviews/gpt-6-astra/index.html

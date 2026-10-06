@@ -1,19 +1,19 @@
 """house_style — the Better Graphs lever: a figure is a small publication.
 
-Three questions, asked in order, decide every figure:
+Start with reader/task/context, inspect the evidence, then earn the headline.
+``VISUALIZATION_GUIDE.md`` defines the decision brief and acceptance checks.
+``theme("glance"|"read"|"study")`` sets typography and density, never permission
+to hide material uncertainty. ``page`` supplies an optional editorial anatomy;
+``mark`` and direct labels are aids, not mandatory persuasion. Legends, neutral
+titles and co-equal series are valid when they serve the task.
 
-1. **What am I saying?** — chart choice; answered by ``VISUALIZATION_GUIDE.md``.
-2. **Who is reading?** — the *register*: ``glance`` (3 seconds, a slide or poster),
-   ``read`` (30 seconds, a report or README), ``study`` (minutes, an appendix or
-   datasheet). The register sets the type scale, density and annotation budget.
-3. **How hard should I try?** — the *altitude*: A0 themed default (exploration),
-   A1 composed catalog chart (the default for anything shared), A2 bespoke
-   Artist drawing (only when the form itself carries the message and the
-   audience pays for the craft). The test lives in ``VISUALIZATION_GUIDE.md``.
+These helpers do not validate data, interval semantics, accessible alternatives,
+or the strength of a claim. Check the exported figure at its destination size.
+The public plotting API and palette remain unchanged by the philosophy revision.
 
 The visual identity: warm paper, warm ink, two typefaces (League Spartan for
 display, Junction for working text), one violet accent leading a palette that
-is *computed*, not eyeballed (``check_palette.py``), and an editorial page
+is checked under a CVD simulation model (``check_palette.py``), and an editorial page
 anatomy — kicker, title, dek, plot, source line — built at figure level with
 inch-true margins.
 
@@ -23,7 +23,7 @@ Minimal use::
     house_style.theme("read")
     fig, ax = house_style.page(
         kicker="Air travel · 1949–1960",
-        title="The jet age took off before the jets did",
+        title="International airline passenger totals rose, 1949–1960",
         dek="Passengers on international airlines, thousands per year.",
         source="Source: Box & Jenkins airline series",
     )
@@ -63,7 +63,7 @@ SMOKE = "#D8D2C6"      # faintest context (backgrounded small-multiple ghosts)
 ACCENT = "#6400FF"     # the house violet — one series speaks
 # Validated categorical order (check_palette.py: min pairwise dE 26.6 under
 # protanopia/deuteranopia/tritanopia; contrast >= 3:1 on PAPER and on white).
-# Assign in FIXED order; never cycle back for an 8th series — redesign instead.
+# Default order; do not cycle into ambiguous identities. Consider labels or facets.
 SERIES = ["#6400FF", "#0FA077", "#C67D10", "#5C2340", "#142A6E", "#93330E"]
 VIOLET, EMERALD, OCHRE, WINE, NAVY, RUST = SERIES
 
@@ -188,7 +188,7 @@ def page(size=None, kicker=None, title=None, dek=None, source=None, note=None,
 
     ``dek_highlights`` colour-keys ``<bracketed>`` words in the dek to series
     colours via highlight_text — the legend dissolves into the sentence, at
-    body size, leaving the title to carry only the message.
+    body size. Use a legend instead when it makes identities easier to decode.
     """
     reg = _current
     presets = {
@@ -281,9 +281,8 @@ def finish(ax, grid="y", nbins=None, zero=False, on_grid=None, bound_spine=True)
     grid; ``grid="xy"`` (study) allows both. ``zero=True`` pins the value axis
     to include 0.
 
-    Polish is a *precondition*, not the finish line: a shipped figure still
-    needs its accent series and one interpretive annotation (focused beats
-    merely decluttered — Ajani et al.).
+    Polish does not validate evidence or accessibility. Add emphasis and
+    interpretation only when they serve the reader's task; neither is mandatory.
     """
     nbins = nbins or _current.nbins
     ax.grid(False)

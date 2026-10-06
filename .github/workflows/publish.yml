@@ -1,25 +1,17 @@
-name: Publish curriculum to GitHub Pages
-
-# The datasets are gitignored (regenerable), so they are NOT in the repo. This is
-# the "get around no committed data" answer: CI rebuilds them from their public
-# sources every run, then renders the Quarto curriculum to a single self-contained
-# index.html and deploys it to Pages. Rendering goes through `uv run` so the qmd's
-# jupyter engine uses the project venv (matplotlib + house_style), not a bare system
-# Python — otherwise the build renders wrong or fails.
+name: Build, validate and publish curriculum
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
+  pull_request:
   workflow_dispatch:
 
+# PRs (including forks) and review branches need no publishing credentials.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# One in-flight deploy at a time; let a newer push supersede an older build.
 concurrency:
-  group: pages
+  group: curriculum-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,42 +19,71 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Install uv (+ cache the env)
+      - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
-      - name: Sync the plotting + jupyter stack
-        run: uv sync
+      - name: Sync locked plotting and Jupyter environment
+        run: uv sync --locked
 
       - name: Install Quarto
         uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.9.38'
 
-      - name: Build datasets (regenerate the gitignored data in CI)
+      - name: Build datasets
         run: uv run python data/build_datasets.py
 
-      - name: Render the curriculum (jupyter engine via the uv venv)
+      - name: Test API, curriculum code and workflow boundary
+        run: uv run python -m unittest discover -s tests -v
+
+      - name: Check house palette on paper and white
+        run: uv run python scripts/check_house_palette.py
+
+      - name: Render curriculum with executed Python cells
         run: uv run quarto render visualization-curriculum/better_graphs.qmd
 
-      - name: Assemble the site
+      - name: Validate HTML and repository links
+        run: uv run python scripts/validate_review.py
+
+      - name: Assemble self-contained site
         run: |
           mkdir -p _site
           cp visualization-curriculum/index.html _site/index.html
-          touch _site/.nojekyll   # tell Pages not to run Jekyll over the output
+          touch _site/.nojekyll
 
-      - name: Upload Pages artifact
+      - name: Upload downloadable review (not a deployment)
+        uses: actions/upload-artifact@v4
+        with:
+          name: curriculum-review
+          path: _site/index.html
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload Pages artifact (main release events only)
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
   deploy:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages-production
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy approved main build to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

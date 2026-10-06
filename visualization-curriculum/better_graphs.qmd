@@ -1,8 +1,8 @@
 ---
 title: "Better Graphs"
-subtitle: "A matplotlib craft curriculum — from competent defaults to charts that read as deliberate"
+subtitle: "Evidence-first visualization — decisions, uncertainty and readable craft"
 author: "github.com/temataro"
-AI Assistance: "Claude Opus 4.8"
+editorial-review: "gpt-6-astra (configured model label; review branch)"
 date: last-modified
 format:
   html:
@@ -28,34 +28,48 @@ jupyter: python3
 
 ## Preface — what this course is {.unnumbered}
 
-Most matplotlib output looks like matplotlib: boxed-in spines, a primary blue, a title that
-just repeats the y-axis label, and ticks at whatever round numbers the library guessed. Fixing
-that is **not a question of competence but of taste**, and taste can be written down
-as rules. This curriculum is the rulebook.
+A good chart makes evidence usable for a particular reader and task. Its style should help that
+work, not predetermine the conclusion. We start with a question, inspect data and limitations,
+choose an encoding, and only then earn the headline. A neutral title, a table, or “the evidence
+is inconclusive” can be more useful than a striking takeaway.
+
+This revision retains the M0–M7 code and before/after teaching examples while changing the
+standard by which to judge them: **what can the reader accurately infer, and what might they
+miss?** The “after” is a task-adapted proposal, not proof that the house aesthetic always wins.
 
 ::: {.callout-note}
-Note that although this 'blog's curriculum and content choice was entirely
-designed by myself as a way to teach AI agents, interns, or myself what kind of
-graphs look and feel right, almost all the actual code snippets and text here
-are a product of a very long conversation with one AI agent (as of June 2026,
-that is Claude Code running Opus 4.8. I would like to revisit this idea every
-so often when I feel a step function has been reached in the performance of
-agents to see what the new kids on the block can come up with!
+## Authorship and scope
+The repository previously attributed its initial curriculum and code assistance to Claude Opus 4.8
+under human direction. That historical attribution is retained as a repository claim, not independently
+verified here. This independent editorial revision uses the configured model label **gpt-6-astra**.
+It is a review-branch proposal, not a human-approved replacement or a published release.
 :::
 
-Edward Tufte's *The Visual Display of Quantitative Information* is the north star: maximize the
-share of ink that carries data, cut the rest, and never let the chart mislead. Each module states
-**one principle**, builds **one thing**, and extracts **one durable rule** that gets folded back into
-the project's reusable artifacts (`CLAUDE.md`, `VISUALIZATION_GUIDE.md`, `house_style.py`) — so a
-future agent can produce the same quality with zero re-explanation.
+Tufte's integrity and economy remain useful influences. They do not require removing every gridline,
+forcing a finding, or hiding uncertainty on a slide. The practical rule is: retain whatever supports
+orientation, comparison and qualification; cut what obstructs them. Each module ends by extracting
+a reusable decision and an observable check.
 
 ::: {.callout-tip}
 ## How to read the code
-Every figure obeys the house rules: the object-oriented (OO) API, `house_style.theme()` first, a title
-that states the *takeaway*, a bounded/finished axes, and unit-aware ticks. The **only** exception is a
-counterexample that is explicitly labelled "the look we're escaping" — those keep matplotlib's raw
-defaults on purpose.
+The OO API, `house_style.theme()`, `page()`, `finish()` and `save()` remain the toolkit. They cannot
+validate a claim. Direct labels, accents and callouts are options, not quotas. Raw/default examples
+remain for comparison. Public datasets, engineered datasets (such as Datasaurus), toy arrays and
+synthetic RF curves are teaching evidence with different provenance, not interchangeable observations.
 :::
+
+## A decision brief before a design {.unnumbered}
+
+1. **Reader / task / context:** who needs to compare what, at what size, to make which decision?
+2. **Evidence:** source/version, sampling unit, units, denominator, n, coverage, missingness and filters.
+3. **Choice:** “`<chart>` because `<shape>` + `<task>`”; test a table or another familiar form.
+4. **Claim:** after inspection, a supported finding or an open question, with scope and limitations.
+5. **Delivery:** register, dimensions, redundant identities, alternative text and an acceptance check.
+
+For example, a colleague comparing life-expectancy *changes* needs paired endpoints; a reader comparing
+absolute levels might reasonably prefer grouped bars. No encoding alone justifies a causal claim.
+The [design guide](https://github.com/temataro/better-graphs/blob/gpt-6-astra/VISUALIZATION_GUIDE.md)
+is the full decision authority for this review. Branch links intentionally show the reviewed version.
 
 ```{python}
 #| label: setup
@@ -88,9 +102,79 @@ def title(ax, msg, fontsize=13, **kw):
 from ndata import load, select, group, pivot, rolling_mean, corr, std, finite, MONTHS
 ```
 
+# Worked review — fewer failures, greater exposure-adjusted rate
+
+**Decision brief.** An operations reader wants to compare failure risk, not workload. These
+are invented independent binomial samples for teaching, not a product evaluation. Treat
+trials as equally exposed with constant risk within each period; real repeated-device or
+clustered data would need a different method. Compare a count bar with a rate-and-interval
+plot: only the latter answers this task. Neither establishes what caused the difference.
+
+```{python}
+#| label: fig-evidence-rates
+#| fig-cap: "Illustrative rates with 95% Wilson intervals. Unequal denominators reverse the count-only impression; intervals describe each rate, not the difference."
+#| fig-alt: "Dot-and-interval chart of invented failure rates: before, 18 of 200 (9%); after, 12 of 80 (15%). Both estimates are uncertain. Fewer failures does not imply lower risk; no causal effect is established."
+periods = ["Before", "After"]
+failures = np.array([18, 12])
+trials = np.array([200, 80])
+rates = failures / trials
+z_score = 1.959963984540054  # standard normal 97.5th percentile
+wilson_denominator = 1 + z_score**2 / trials
+wilson_center = (rates + z_score**2 / (2 * trials)) / wilson_denominator
+wilson_half_width = z_score * np.sqrt(
+    rates * (1 - rates) / trials + z_score**2 / (4 * trials**2)
+) / wilson_denominator
+lower = wilson_center - wilson_half_width
+upper = wilson_center + wilson_half_width
+assert np.all((0 <= lower) & (lower < rates) & (rates < upper) & (upper <= 1))
+
+house_style.theme("read")
+fig, ax = house_style.page(
+    kicker="Illustrative data · unequal exposure",
+    title="Fewer failures need not mean lower risk",
+    dek="Failure rate (% of trials); 95% Wilson intervals, independent binomial model.",
+    source="Source: invented teaching counts (18/200; 12/80), not measured outcomes.",
+)
+for row, period in enumerate(periods):
+    ax.errorbar(
+        100 * rates[row], row,
+        xerr=[[100 * (rates[row] - lower[row])], [100 * (upper[row] - rates[row])]],
+        fmt="o", color=house_style.INK, capsize=4,
+    )
+    ax.text(27, row, f"{failures[row]}/{trials[row]} = {rates[row]:.0%}",
+            va="center", fontsize=11, color=house_style.INK)
+ax.set_yticks([0, 1], periods)
+ax.set_xlim(0, 40)
+ax.set_ylim(1.6, -0.6)
+house_style.finish(ax, grid="x")
+ax.set_xticks([0, 10, 20, 30, 40], ["0%", "10%", "20%", "30%", "40%"])
+for text in fig.texts:
+    if text.get_text().startswith("Source:"):
+        text.set_color(house_style.MUTED)
+house_style.save(fig, "evidence_rates")
+```
+
+```{python}
+#| label: evidence-rates-table
+#| results: asis
+#| echo: false
+print("| Period | Failures / trials | Rate | 95% Wilson interval |")
+print("|---|---:|---:|---:|")
+for row, period in enumerate(periods):
+    print(f"| {period} | {failures[row]} / {trials[row]} | {rates[row]:.1%} | "
+          f"{lower[row]:.1%}–{upper[row]:.1%} |")
+```
+
+**Review outcome.** Counts decreased by one third, while the observed rate increased by
+6 percentage points. The two rate intervals do not test the difference. A decision about
+harm would need a pre-specified practical threshold, a suitable difference estimate, and
+attention to changes in case mix, exposure, and measurement. Equal ink and direct labels
+avoid suggesting one period deserves trust or blame; the table provides a non-visual route.
+The release checklist still requires inspection of the final export and reader comprehension.
+
 # M0 — Environment & the mental model
 
-**Principle.** Almost all "ugly default" pain is really *fighting the pyplot state machine* — the
+**Principle.** Explicit object handles make visual decisions reproducible. One source of layout bugs is *fighting the pyplot state machine* — the
 `plt.plot`, `plt.title`, `plt.xlabel` style, where "the current axes" is invisible global state you can
 only nudge, never hold. The cure is one line, and it reorganizes everything that follows.
 
@@ -126,6 +210,7 @@ a y-axis in bare thousands, and a title that just names the variable.
 ```{python}
 #| label: ugly-default
 #| fig-cap: "Matplotlib's raw defaults — competent, anonymous, and a little hard to read."
+#| fig-alt: "Matplotlib's raw defaults — competent, anonymous, and a little hard to read."
 months = np.arange(1, 13)
 revenue = np.array([41, 38, 46, 52, 55, 61, 68, 64, 59, 50, 47, 44]) * 1000
 
@@ -148,6 +233,7 @@ to a legend.
 ```{python}
 #| label: oo-rebuild
 #| fig-cap: "Same data on the OO API: grey for context, one accent for the point, a title that says something."
+#| fig-alt: "Same data on the OO API: grey for context, one accent for the point, a title that says something."
 month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 peak_month_index = int(revenue.argmax())
@@ -178,7 +264,7 @@ peak_label = ax.annotate(
 )
 ```
 
-The difference is entirely in *which Artists we grabbed and what we set on them* — which is the whole game.
+The data are unchanged. The styling changes attention, not evidential strength: verify that the highlighted point deserves that attention.
 
 ## Figure → Axes → Artist: the hierarchy
 
@@ -196,6 +282,7 @@ up the next idea.
 ```{python}
 #| label: artist-hierarchy
 #| fig-cap: "Every visible thing is an Artist. Callouts are placed in axes-fraction coordinates."
+#| fig-alt: "Every visible thing is an Artist. Callouts are placed in axes-fraction coordinates."
 x_values = np.linspace(0, 10, 200)
 
 fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
@@ -249,6 +336,7 @@ panels below, even though their y-ranges differ by 1000×.
 ```{python}
 #| label: transforms-proof
 #| fig-cap: "Same axes-fraction point (0.5, 0.5) in both panels — identical position despite a 1000x data-range gap."
+#| fig-alt: "Same axes-fraction point (0.5, 0.5) in both panels — identical position despite a 1000x data-range gap."
 fig, axes = plt.subplots(1, 2, figsize=(9, 3.4), constrained_layout=True)
 
 for ax, y_scale in zip(axes, [1, 1000]):
@@ -272,6 +360,7 @@ truly raw axes beside a themed one in a single canvas, because the theme is glob
 ```{python}
 #| label: m0-capstone-before
 #| fig-cap: "Before — matplotlib's untouched defaults: boxed in, primary blue, a title that just renames the y-axis."
+#| fig-alt: "Before — matplotlib's untouched defaults: boxed in, primary blue, a title that just renames the y-axis."
 flights = load("flights")
 month_index = np.array([list(MONTHS).index(month_name) for month_name in flights["month"]])  # name → 0..11
 decimal_year = flights["year"] + month_index / 12
@@ -289,6 +378,7 @@ with plt.style.context("default"):  # the only honest way to show raw defaults p
 ```{python}
 #| label: m0-capstone-after
 #| fig-cap: "After — the OO API under house_style.theme: grey for context, the accent on the trend, a takeaway title, a finished axes."
+#| fig-alt: "After — the OO API under house_style.theme: grey for context, the accent on the trend, a takeaway title, a finished axes."
 fig, ax = plt.subplots(constrained_layout=True)
 ax.plot(decimal_year, passengers, color=GREY, lw=1.1)  # the monthly series = context
 
@@ -317,6 +407,8 @@ and a title that says what happened instead of renaming the axis.
 
 ::: {.callout-important}
 ## Extract — M0 rules
+**Acceptance check:** the plotted arrays and units are unchanged by styling; no emphasis implies an unsupported finding.
+
 1. **Hold handles.** `fig, ax = plt.subplots(constrained_layout=True)`; never `plt.*` plotting afterward.
 2. **Everything is an Artist** — to change anything, grab it and `.set_*()`.
 3. **Pick the coordinate system deliberately** — data for things tied to values, axes-fraction for things
@@ -332,12 +424,12 @@ question. So the rule of this module is a sentence you say out loud first:
 > **"`<chart>` because `<shape>` + `<task>`."** — stated before you type `plt.subplots`.
 
 The full framework — the pre-flight checklist, a *(data shape × task) → chart* lookup, a chart catalog, and
-the anti-patterns — lives in [`VISUALIZATION_GUIDE.md`](../VISUALIZATION_GUIDE.md). Here we *earn* three of its
+the anti-patterns — lives in [`VISUALIZATION_GUIDE.md`](https://github.com/temataro/better-graphs/blob/gpt-6-astra/VISUALIZATION_GUIDE.md). Here we *earn* three of its
 hardest lessons by doing each the wrong way first, on the project's real datasets.
 
 ::: {.callout-note}
 ## The pre-flight checklist (the condensed version)
-1. **Message** — the one sentence the figure must land. (It becomes the title.)
+1. **Evidence and question** — inspect provenance, units, missingness and scope before deciding what the title can claim.
 2. **Audience & medium — pick the register** — slide/poster → `glance`; report/README → `read`;
    appendix/datasheet → `study`.
 3. **Data shape** — how many variables, each one's *type* (quantitative / categorical / temporal / geographic),
@@ -362,7 +454,8 @@ near-zero correlation — yet wildly different shapes.
 
 ```{python}
 #| label: m1-datasaurus
-#| fig-cap: "Four of the Datasaurus Dozen. Identical summary statistics; only the scatter is honest."
+#| fig-cap: "Four engineered Datasaurus datasets share summary statistics; scatterplots reveal their different shapes."
+#| fig-alt: "Four engineered Datasaurus datasets share summary statistics; scatterplots reveal their different shapes."
 featured_shapes = ["dino", "star", "bullseye", "x_shape"]
 
 # Compute the shared statistics from the data — never transcribe remembered constants.
@@ -408,6 +501,7 @@ directly: it **is** the segment between the two dots.
 ```{python}
 #| label: m1-dumbbell
 #| fig-cap: "Same numbers, two encodings. Grouped bars make you subtract; the dumbbell shows the change — and the exception."
+#| fig-alt: "Same numbers, two encodings. Grouped bars make you subtract; the dumbbell shows the change — and the exception."
 countries = ["China", "Indonesia", "Brazil", "India", "Botswana", "Ethiopia", "Zimbabwe"]
 is_endpoint_year = np.isin(gapminder["country"], countries) & np.isin(gapminder["year"], [1952, 2007])
 country, _, life_exp_matrix = pivot(
@@ -464,15 +558,16 @@ source = fig.text(0.012, -0.02, "Data: Gapminder (1952 vs 2007).", fontsize=8, c
 Same numbers in both panels. The bars are honest but mute; the dumbbell says *"almost everyone rose — and
 here is the one who didn't"* before you've read a single label.
 
-## Lesson 3 — part-to-whole is a bar, not a pie
+## Lesson 3 — ranking shares favours bars over angles
 
 *Task:* part-to-whole **and** ranking. A pie asks the reader to compare angles and chase a legend; past about
 five slices it fails at the very thing ranking needs. A **sorted bar** makes order and magnitude immediate —
-which is why the house rule is *no pie beyond ~5 slices* (`CLAUDE.md`).
+so the bar is a better starting point for this nine-category ranking. A few labelled slices can still serve a rough part-to-whole task.
 
 ```{python}
 #| label: m1-partwhole
 #| fig-cap: "World population 2007 by country. The pie hides the ranking the sorted bar makes obvious."
+#| fig-alt: "World population 2007 by country. The pie hides the ranking the sorted bar makes obvious."
 # In 2007 each country appears once, so its row IS its population — sort, take the top 8, pool the rest.
 is_2007 = gapminder["year"] == 2007
 country, population = gapminder["country"][is_2007], gapminder["pop"][is_2007]
@@ -519,7 +614,7 @@ source = fig.text(
 )
 ```
 
-Both panels show the same nine numbers. Only the bar lets you rank them at a glance — and the accent puts the
+Both panels show the same nine numbers. The bar makes close ranks easier to compare — and the accent puts the
 two-country dominance where the eye lands first.
 
 ## Before & after — a relationship needs a scatter, not a bar of means
@@ -531,6 +626,7 @@ scatter answers the one we asked — and the cluster structure falls out for fre
 ```{python}
 #| label: m1-capstone
 #| fig-cap: "Same question — how do flipper length and mass relate? A bar of means can't answer it; a scatter can."
+#| fig-alt: "Same question — how do flipper length and mass relate? A bar of means can't answer it; a scatter can."
 penguins = load("penguins")
 penguins = select(penguins, finite(penguins["flipper_length_mm"], penguins["body_mass_g"]))  # ≈ dropna
 species = ["Adelie", "Chinstrap", "Gentoo"]
@@ -575,6 +671,8 @@ the reader gets to answer.
 
 ::: {.callout-important}
 ## Extract — M1 rules
+**Acceptance check:** a reader can perform the intended comparison; check excluded/unpaired observations and whether a table would be more precise.
+
 1. **Ask before you plot.** Say *"`<chart>` because `<shape>` + `<task>`"* before `plt.subplots`. The full
    checklist, the *(shape × task) → chart* lookup, and the catalog live in `VISUALIZATION_GUIDE.md`.
 2. **Match the encoding to the task's *verb*, not the data's columns** — change → dumbbell/slope,
@@ -599,6 +697,7 @@ craft is sharing **one colour encoding** across them so the eye carries meaning 
 ```{python}
 #| label: m2-mosaic
 #| fig-cap: "subplot_mosaic: a main view plus two context panels, with a single continent colour key shared across them."
+#| fig-alt: "subplot_mosaic: a main view plus two context panels, with a single continent colour key shared across them."
 gapminder_2007 = select(gapminder, gapminder["year"] == 2007)
 continent_color = {
     "Africa": house_style.VIOLET, "Americas": house_style.OCHRE, "Asia": house_style.EMERALD,
@@ -655,6 +754,7 @@ not by eye.
 ```{python}
 #| label: m2-inset
 #| fig-cap: "An inset magnifies the passband peak of a measured S21 trace while the overview stays put."
+#| fig-alt: "An inset magnifies the passband peak of a measured S21 trace while the overview stays put."
 ring_slot = load("rf_ring_slot")
 frequency_ghz = ring_slot["freq_ghz"]
 s21_db = 20 * np.log10(np.abs(ring_slot["s21"]))  # magnitude in dB, straight from the complex S-parameter
@@ -689,6 +789,7 @@ The most common layout failure is forcing many series into one axes. Same data, 
 ```{python}
 #| label: m2-capstone-before
 #| fig-cap: "Before — every country's trajectory in one axes. All the data is here; none of it is readable."
+#| fig-alt: "Before — every country's trajectory in one axes. All the data is here; none of it is readable."
 fig, ax = plt.subplots(figsize=(7, 4.2), constrained_layout=True)
 for country_name in np.unique(gapminder["country"]):
     in_country = gapminder["country"] == country_name
@@ -708,6 +809,7 @@ note = fig.text(0.0, -0.02, "Data: Gapminder, 1952–2007.", fontsize=8, color="
 ```{python}
 #| label: m2-capstone-after
 #| fig-cap: "After — one panel per continent, the continental median in accent, a shared y-axis. Every region is legible."
+#| fig-alt: "After — one panel per continent, the continental median in accent, a shared y-axis. Every region is legible."
 continents = ["Africa", "Americas", "Asia", "Europe", "Oceania"]
 fig, axes = plt.subplots(1, 5, figsize=(12, 3.0), sharey=True, constrained_layout=True)
 for ax, continent_name in zip(axes, continents):
@@ -741,28 +843,29 @@ source = fig.text(
 
 ::: {.callout-important}
 ## Extract — M2 rules
+**Acceptance check:** inspect the final column/slide size, not only the notebook. Shared scales enable magnitude comparison; label free scales if inspecting shape instead.
+
 1. **The figure is the master coordinate.** Choose figure size (inches) × dpi *first* — points are physical,
    so a 10-pt label is larger on a small figure — then let `constrained_layout=True` manage spacing.
 2. **Compose, don't cram.** `subplot_mosaic` lays out a main view plus context panels; share one colour
    encoding across them so meaning carries between panels.
-3. **Many series → small multiples**, never spaghetti: one panel per group, shared axes, the summary in accent.
+3. **Many overlapping series → consider small multiples.** Use shared axes for magnitude comparison; preserve individual trajectories when variation is the task.
 4. **Zoom with an inset** (`ax.inset_axes` + `ax.indicate_inset_zoom`) to keep overview and detail together.
 :::
 
 # M3 — Typography: the page carries the legend
 
-Type is half of what makes a chart read as *professional*, and most of that is decisions, not fonts. The
-single highest-leverage move: the **title states the takeaway**, and the series names live in the **dek** —
-the standfirst under the title — **colour-keyed** to the data, so the legend dissolves into a sentence and
-the reader's eye never leaves the plot to decode a key. `house_style.page(kicker=, title=, dek=,
-dek_highlights=[...])` does exactly this: `<bracketed>` words in the dek take the series colours (wrapping
-`highlight_text`), while the title stays plain — a sentence with a verb, never the axis names.
+Type provides orientation and hierarchy. In the example below, a supported finding leads and series
+names are colour-keyed into the dek with `page(dek_highlights=...)`. This can reduce lookup, but coloured
+words alone do not guarantee accessible identification. Use end labels, distinct line styles or a
+legend when needed. A descriptive title is valid when the task is exploration or lookup.
 
 ## The legend, dissolved into the dek
 
 ```{python}
 #| label: m3-keyed
 #| fig-cap: "Each country's name is coloured to its line in the dek — no legend box, no round-trip for the eye."
+#| fig-alt: "Each country's name is coloured to its line in the dek — no legend box, no round-trip for the eye."
 series_color = {"China": ACCENT, "Brazil": house_style.EMERALD}
 
 
@@ -804,6 +907,7 @@ keys the species into the dek.
 ```{python}
 #| label: m3-capstone-before
 #| fig-cap: "Before — a title that renames the axis, a boxed legend in the corner."
+#| fig-alt: "Before — a title that renames the axis, a boxed legend in the corner."
 adelie_mass = penguins["body_mass_g"][penguins["species"] == "Adelie"]
 gentoo_mass = penguins["body_mass_g"][penguins["species"] == "Gentoo"]
 pct_heavier = round(100 * (np.nanmean(gentoo_mass) / np.nanmean(adelie_mass) - 1))
@@ -823,6 +927,7 @@ ax.legend(loc="upper right", frameon=True, fontsize=9)
 ```{python}
 #| label: m3-capstone-after
 #| fig-cap: "After — the finding is the title; the dek carries the key. The legend is gone."
+#| fig-alt: "After — the finding is the title; the dek carries the key. The legend is gone."
 fig, ax = house_style.page(
     size=(6.6, 4.4),
     kicker="Palmer penguins · body mass",
@@ -840,9 +945,11 @@ house_style.ylabel_above(ax, "Count")
 
 ::: {.callout-important}
 ## Extract — M3 rules
-1. **The title states the takeaway**, never the axis name.
+**Acceptance check:** cover the headline and test whether the marks support it; qualifications remain legible and series identity survives loss of hue.
+
+1. **The title matches the evidence:** a supported takeaway, a question, or a descriptive scope. Do not imply certainty that the data lack.
 2. **Colour-key the series words into the dek** with `house_style.page(dek=, dek_highlights=[...])` — a
-   coloured word in the sentence beats a legend box every time.
+   coloured word can shorten lookup. Use a legend or direct labels when colour alone or text collisions would fail.
 3. **Type is hierarchy.** One clear weight/size step from title → labels → annotations; let the message sit at
    the top of it.
 :::
@@ -863,6 +970,7 @@ The same five bars, coloured three ways — each palette type answers a *differe
 ```{python}
 #| label: m4-three-types
 #| fig-cap: "One bar chart, three palette TYPES: naming the groups, encoding magnitude, or showing deviation."
+#| fig-alt: "One bar chart, three palette TYPES: naming the groups, encoding magnitude, or showing deviation."
 is_2007 = gapminder["year"] == 2007
 continent, median_life_exp = group(
     gapminder["continent"][is_2007], gapminder["lifeExp"][is_2007], np.nanmedian
@@ -911,6 +1019,7 @@ zero, so white means "average" and the two hues are honestly symmetric.
 ```{python}
 #| label: m4-diverging
 #| fig-cap: "Each cell = a month's passengers minus that year's mean; RdBu_r on a symmetric, zero-centred norm."
+#| fig-alt: "Each cell = a month's passengers minus that year's mean; RdBu_r on a symmetric, zero-centred norm."
 flights = load("flights")
 _, years, passenger_matrix = pivot(
     flights["month"], flights["year"], flights["passengers"],
@@ -940,6 +1049,7 @@ The most common colour crime: a rainbow ramp on sequential data. Same passenger 
 ```{python}
 #| label: m4-capstone
 #| fig-cap: "Sequential data wants a perceptually-uniform ramp: jet invents bands that aren't in the data; viridis doesn't."
+#| fig-alt: "Sequential data wants a perceptually-uniform ramp: jet invents bands that aren't in the data; viridis doesn't."
 fig, (jet_ax, viridis_ax) = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True, sharey=True)
 
 jet_image = jet_ax.imshow(passenger_matrix, aspect="auto", cmap="jet")
@@ -968,6 +1078,8 @@ source = fig.text(
 
 ::: {.callout-important}
 ## Extract — M4 rules
+**Acceptance check:** palette simulation is not a chart accessibility audit. Check thin marks and text contrast; use labels, patterns or panels redundantly.
+
 1. **Palette type follows the data:** categorical (`house_style.SERIES`) for groups, sequential
    (**viridis** or `house_style.SEQUENTIAL`) for magnitude, diverging (`house_style.diverging_norm`, centred,
    with `house_style.DIVERGING`) for signed values.
@@ -989,6 +1101,7 @@ the house theme — what changes is only the data-ink.
 ```{python}
 #| label: m5-polish-line
 #| fig-cap: "Both panels are house-themed; only the polish pass differs — a bounded axis, fewer ticks, and a direct end-label instead of a boxed legend."
+#| fig-alt: "Both panels are house-themed; only the polish pass differs — a bounded axis, fewer ticks, and a direct end-label instead of a boxed legend."
 flights = load("flights")
 year, passengers_per_year = group(flights["year"], flights["passengers"].astype(float), np.nansum)
 
@@ -1035,6 +1148,7 @@ spent on scaffolding.
 ```{python}
 #| label: m5-capstone
 #| fig-cap: "Default vertical bars vs. a polished horizontal ranking: sorted, direct value labels, one accent — both on the house theme."
+#| fig-alt: "Default vertical bars vs. a polished horizontal ranking: sorted, direct value labels, one accent — both on the house theme."
 gapminder = load("gapminder")
 is_2007 = gapminder["year"] == 2007
 continent, median_life_expectancy = group(
@@ -1078,6 +1192,8 @@ source = fig.text(
 
 ::: {.callout-important}
 ## Extract — M5 rules
+**Acceptance check:** retain grids needed for lookup, verify baselines and tick units, and reject clipped or colliding labels in exports.
+
 1. **Run the polish pass in order:** trim + offset the spines → fewer, rounder ticks (`MaxNLocator` on the
    *value* axis) → grid *behind* the data (`set_axisbelow(True)`) → deliberate margins.
 2. **`house_style.finish(ax, grid="y"|"x")` is the one-call lever.** Name the value axis so the categorical
@@ -1100,6 +1216,7 @@ run the **same plotting function** — only the register argument changes.
 ```{python}
 #| label: m6-glance
 #| fig-cap: "register='glance' — a wide slide aspect, a larger title, a slim tick budget. The plotting body is identical to the next figure."
+#| fig-alt: "register='glance' — a wide slide aspect, a larger title, a slim tick budget. The plotting body is identical to the next figure."
 def plot_passengers_by_year(ax):
     """The plotting body, themed by whichever register is active when it runs."""
     flights = load("flights")
@@ -1121,6 +1238,7 @@ source = fig.text(0.0, -0.02, "Data: classic airline passengers, 1949–1960.", 
 ```{python}
 #| label: m6-study
 #| fig-cap: "Same plot_passengers_by_year() — only register='study' changed: a denser tick budget and a canvas that gives an appendix room to breathe."
+#| fig-alt: "Same plot_passengers_by_year() — only register='study' changed: a denser tick budget and a canvas that gives an appendix room to breathe."
 house_style.theme("study")
 fig, ax = plt.subplots(constrained_layout=True)
 plot_passengers_by_year(ax)
@@ -1135,6 +1253,8 @@ exactly this pattern to set print-only font handling at save time without touchi
 
 ::: {.callout-important}
 ## Extract — M6 rules
+**Acceptance check:** attention changes density, not truth. Material uncertainty and limitations remain visible in glance, read and study.
+
 1. **`house_style.theme(register)` is the first plotting line, every time.** `"glance"` for slides and
    single-message charts; `"read"` for reports/READMEs; `"study"` for appendices and multi-panel figures.
 2. **Define the look once, reuse it everywhere.** A shared theme — not per-chart hand-styling — is what makes
@@ -1147,8 +1267,8 @@ exactly this pattern to set print-only font handling at save time without touchi
 
 **Principle.** One dataset earns **two figures**. The *glance* cut carries a single message on one accented
 series with the axes stripped to the point — built for a slide. The *study* cut is a multi-panel datasheet,
-layering a second dataset and a secondary axis — built for the appendix. Then you **export right**: vector for
-print and slides, a 2× PNG for the web. Same DUT measurements throughout, two deliberate treatments, each a
+layering a second synthetic dataset and a secondary axis — built for the appendix, with scaling caveats. Then you **export right**: vector for
+print and slides, a 2× PNG for the web. Synthetic DUT teaching curves throughout, two deliberate treatments, each a
 full `page()` — kicker, title, dek, source.
 
 ## The glance cut — one message, one series
@@ -1156,6 +1276,7 @@ full `page()` — kicker, title, dek, source.
 ```{python}
 #| label: m7-glance
 #| fig-cap: "glance cut: one accented curve on a full page anatomy, the two band edges labelled — then exported as SVG + PDF + 2x PNG."
+#| fig-alt: "glance cut: one accented curve on a full page anatomy, the two band edges labelled — then exported as SVG + PDF + 2x PNG."
 house_style.theme("glance")
 dut_report = load("rf_dut_report")
 frequency_ghz = dut_report["freq_ghz"]
@@ -1183,9 +1304,15 @@ glance_exports = house_style.save(fig, "dut_glance")
 
 ## The study cut — a multi-panel datasheet with a twin axis
 
+The gain and efficiency scales are independent. Their crossing and apparent relative slopes have
+no invariant meaning: rescaling either axis would move them. Colour-keying identifies the series;
+it does not solve that problem. For a non-specialist audience use stacked shared-x panels instead.
+These curves are synthetic and their specification bands are teaching thresholds, not confidence intervals.
+
 ```{python}
 #| label: m7-study
 #| fig-cap: "study cut: gain, noise figure and return loss over frequency, plus a PA compression panel whose twin axis is colour-keyed (dB to gain, % to PAE)."
+#| fig-alt: "study cut: gain, noise figure and return loss over frequency, plus a PA compression panel whose twin axis is colour-keyed (dB to gain, % to PAE)."
 house_style.theme("study")
 dut_report = load("rf_dut_report")
 frequency_ghz = dut_report["freq_ghz"]
@@ -1231,7 +1358,7 @@ house_style.ylabel_above(return_loss_ax, r"$S_{11}$ (dB)")
 house_style.finish(return_loss_ax)
 
 # D — PA compression: gain (left, dB) and PAE (right, %) share a drive axis but not a scale,
-#     so each y-axis is colour-keyed to its own series — the only honest way to twin axes.
+#     so each y-axis is colour-keyed to its own series — identity aids, not protection against arbitrary scaling.
 compression_ax = panels["D"]
 compression_ax.plot(input_drive_dbm, pa_gain_db, color=GAIN_COLOR, lw=2)
 house_style.panel_title(compression_ax, "PA compression & efficiency")
@@ -1266,17 +1393,102 @@ print-only font handling inside an `rc_context`, so saving never disturbs the on
 
 ::: {.callout-important}
 ## Extract — M7 rules
+**Acceptance check:** synthetic status travels with the chart. The twin-axis panel is a domain convention, not a scale-invariant comparison; crossings and relative slopes are not evidence. Prefer shared-x panels for general readers.
+
 1. **One dataset, two figures.** A glance cut (one message, one accent, axes stripped) for the slide; a study
    cut (multi-panel datasheet, a layered second dataset, annotations) for the appendix. Choose by register.
-2. **Twin axes only when units truly differ** (dB vs. %), and then **colour-key each y-axis** — label, ticks,
-   *and* spine — to its series. Never stretch one scale across unlike units.
+2. **Prefer shared-x panels.** If domain readers need twin axes, label both units and identify series redundantly; explain that crossings and relative slopes depend on arbitrary scales.
 3. **Export every figure with `house_style.save`:** SVG + PDF (vector, fonts handled) for print and slides,
    PNG at 2× dpi for web — never `bbox_inches="tight"` on a `page()` figure.
 :::
 
+# Decision lab — uncertainty survives the register {.unnumbered}
+
+A request says: “Show that the redesign is faster.” Do not accept the conclusion as an input.
+Here the reader is a colleague deciding whether a **synthetic paired trial** warrants further testing.
+The task is estimating a change, not celebrating a winning average. Each row below represents the
+same fictional participant under two conditions. Improvement is old minus new completion time.
+
+We generate 24 independent fictional participants with a fixed seed, then bootstrap the **paired
+differences**, not the two conditions separately. The interval is a 95% percentile bootstrap interval
+for the mean difference under this teaching model (10,000 resamples). It does not account for order
+effects, selection bias or real deployment conditions. The generated mean is deliberately near zero;
+this is an uncertainty demonstration, not evidence about an actual redesign.
+
+```{python}
+#| label: uncertainty-every-register
+#| fig-cap: "Synthetic paired trial: the same mean improvement and 95% bootstrap interval in glance and study. The interval spans zero; the trial does not resolve the direction of the mean change."
+#| fig-alt: "Two panels show the identical mean paired time improvement with a 95% bootstrap interval crossing the zero reference. The study panel also shows all 24 participant differences. Positive values mean faster; negative values mean slower. These are synthetic data, not a product result."
+trial_rng = np.random.default_rng(20261002)
+old_seconds = trial_rng.normal(60, 8, 24)
+raw_improvement = trial_rng.normal(0, 6, 24)
+improvement_seconds = raw_improvement - raw_improvement.mean() + 0.5
+new_seconds = old_seconds - improvement_seconds
+paired_difference = old_seconds - new_seconds
+bootstrap_means = trial_rng.choice(paired_difference, size=(10000, 24), replace=True).mean(axis=1)
+interval_low, interval_high = np.quantile(bootstrap_means, [0.025, 0.975])
+mean_improvement = paired_difference.mean()
+assert interval_low < 0 < interval_high
+assert np.isclose(mean_improvement, 0.5)
+
+house_style.theme("read")
+fig, uncertainty_axes = house_style.page(
+    size=(10.2, 5.0), mosaic="AB",
+    title="This synthetic trial does not resolve the direction of change",
+    dek="Mean paired improvement in seconds; positive = faster. 95% percentile bootstrap interval; n = 24 pairs.",
+    source="Source: synthetic paired trial, seed 20261002; 10,000 participant-level resamples.",
+    note="Teaching model only; interval excludes selection, order and deployment effects.",
+)
+for panel_key, register_label in [("A", "Glance: keep the interval"), ("B", "Study: add observations")]:
+    interval_ax = uncertainty_axes[panel_key]
+    interval_ax.axvline(0, color=house_style.CONTEXT, linestyle="--", linewidth=1)
+    interval_ax.errorbar(
+        mean_improvement, 0,
+        xerr=[[mean_improvement - interval_low], [interval_high - mean_improvement]],
+        fmt="o", color=ACCENT, capsize=5, markersize=7,
+    )
+    interval_ax.text(
+        0.02, 0.91, f"Mean {mean_improvement:.1f} s; 95% interval {interval_low:.1f} to {interval_high:.1f} s",
+        transform=interval_ax.transAxes, fontsize=9,
+    )
+    interval_ax.set(xlim=(-15, 15), ylim=(-0.65, 0.65), yticks=[], xlabel="Improvement (seconds)")
+    house_style.panel_title(interval_ax, register_label)
+    house_style.finish(interval_ax, grid="x")
+uncertainty_axes["B"].scatter(
+    paired_difference, np.linspace(-0.45, -0.2, len(paired_difference)),
+    color=house_style.INK, marker="|", s=80,
+)
+plt.show()
+```
+
+Both panels deliberately share one figure register and scale for comparison; the panel labels describe
+information budgets, not separate `theme()` calls. The interval remains in the glance budget because
+removing it would change the conclusion. In production, render each destination separately and inspect
+its final dimensions. A zero-crossing interval is not proof of no effect or practical equivalence.
+
+The same evidence in text (a usable alternative to decoding the image):
+
+```{python}
+#| label: uncertainty-accessible-table
+#| output: asis
+print("| Quantity | Value |\n|---|---:|")
+print(f"| Synthetic paired participants | {len(paired_difference)} |")
+print(f"| Mean improvement, seconds | {mean_improvement:.2f} |")
+print(f"| 95% bootstrap interval, seconds | {interval_low:.2f} to {interval_high:.2f} |")
+print("\nPositive means faster. These simulated observations cannot establish a real product effect.")
+```
+
+**Release checks:** preserve pairing and sample size; recompute the interval from the recorded seed;
+keep the zero reference and units; label the method and synthetic status; include the visible caveat
+and text alternative; check output size and contrast. Do not use overlap between two unrelated error
+bars as a substitute for estimating the paired difference.
+
+**Reusable rule:** when uncertainty can reverse the decision, spend the attention budget on it before
+spending that budget on decoration. Simplify the question or split the view rather than hide the limit.
+
 # The whole path, distilled {.unnumbered}
 
-Eight modules, each ending with a before/after on real data and a rule pushed back into the three durable
+Eight modules, each ending with a before/after on documented teaching data and a rule pushed back into the three durable
 artifacts:
 
 | Module | Principle | The lever it left behind |

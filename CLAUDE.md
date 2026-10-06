@@ -6,13 +6,11 @@ This file provides guidance to any capable AI agents when working with code in t
 
 This is not a charts repo that happens to use agents — it is an **agent-instruction repo that happens to
 produce charts**. The real deliverable is a reusable, self-contained instruction set so any future agent can
-make professional, Tufte-grade matplotlib figures with zero re-explanation. The three durable artifacts are:
+make readable, evidence-led matplotlib figures with explicit context and checks. The three durable artifacts are:
 
 - **`CLAUDE.md`** (this file) — the agent operating rules: workflow + hard rules.
-- **`VISUALIZATION_GUIDE.md`** — the full design framework: chart-choice (the 10 rules, a pre-flight checklist,
-  a *(data shape × task) → chart* lookup, a chart catalog), the reader **register** (`glance`/`read`/`study`),
-  the **altitude** ladder for how hard to try (A0 themed default → A1 composed → A2 bespoke, with the four-gate
-  test), the editorial page anatomy, and the computed (CVD-validated) colour system.
+- **`VISUALIZATION_GUIDE.md`** — the design authority: evidence-first decision brief, task-based
+  chart choice, hierarchy, uncertainty, accessibility, registers, effort and release checks.
 - **`visualization-curriculum/house_style.py`** — the one-line lever agents call: `theme(register)`,
   `page(kicker=, title=, dek=, source=)`, `finish()`, `units()`, `label_end()`, `mark()`, `spec_band()`,
   `stat()`, `panel_title()`, `diverging_norm()`, `save()`, the validated `SERIES`/`ACCENT` palette plus
@@ -26,11 +24,10 @@ future agents; `.ipynb` files are byproducts of that, not the working surface.
 
 ## Current state
 
-The curriculum is **complete: M0–M7 are written**, each ending with a before/after on real data and a rule
+The curriculum is **complete: M0–M7 are written**, each ending with a before/after on public or explicitly synthetic teaching data and a rule
 distilled back into the three durable artifacts. The environment is set up and working. What exists:
 
-- `pyproject.toml` + uv-managed `.venv/` + `uv.lock` — the plotting stack is installed; git is initialized
-  on `main`.
+- `pyproject.toml` + uv-managed `.venv/` + `uv.lock` — the plotting stack is installed; the active branch is task-dependent; check it before changes.
 - `visualization-curriculum/house_style.py` — the theme/helpers module: a figure is a small publication —
   registers (`glance`/`read`/`study`) set the type scale and density, `page()` builds the kicker/title/dek/
   source anatomy at inch-true margins, `finish()` polishes the axes. `theme()` loads `minerva.mplstyle`.
@@ -60,58 +57,53 @@ Still planned but **not** present (per `PLAN.md`): the chart builders inside `ho
 
 ## Charting rules (the operating manual)
 
-A figure is a small publication, not a printout of arrays: a headline, a standfirst, a body, and a source
-line, edited for a specific reader with a specific attention budget. Decluttering is the precondition, not the
-payoff — a shipped figure also needs an accent series and a plain-language annotation stating the conclusion
-(*focused* beats merely *decluttered*: Ajani, Xiong, Knaflic & Franconeri).
+A chart is an interface to evidence. A publication-like header is a useful delivery pattern,
+not a substitute for analysis. `VISUALIZATION_GUIDE.md` is the decision authority; if an older
+roadmap or example states an aesthetic absolute, use the guide's conditional rule instead.
 
 ### Workflow (every time, in order)
-1. Write the one-sentence finding, then answer the chart-choice checklist in `VISUALIZATION_GUIDE.md` and
-   state it — *"`<chart>` because `<shape>` + `<task>`."*
-2. Choose the **register** from the reader and say it — `glance` (a slide/poster, ~3 s), `read` (a report/
-   README, ~30 s), or `study` (an appendix/datasheet, minutes). `house_style.theme(register)` is the first
-   plotting line.
-3. Choose the **altitude** — A0 themed default (your own eyes only) → A1 composed catalog chart (**the
-   default for anything shared**) → A2 bespoke Artist drawing. A2 requires passing the four-gate test in
-   `VISUALIZATION_GUIDE.md` aloud.
-4. `fig, ax = house_style.page(kicker=…, title=…, dek=…, source=…)` — the title states the finding (a
-   sentence with a verb, never the axis names); units go in the dek; series names colour-key into the dek
-   (`dek_highlights=[{"color": c1}, ...]`) instead of a legend box.
-5. Draw with the OO API only after `page()` (only `savefig` after that). Accent the message series in
-   `house_style.ACCENT`/`SERIES`; demote context to `house_style.CONTEXT`/`SMOKE`.
-6. `house_style.finish(ax)` (+ `units(ax, "y", kind)` for the unit-on-top-tick), then spend the annotation
-   budget: `label_end()` for line-chart series (the legend, dissolved), `mark()` for the interpretive callout,
-   `spec_band()` for limits, `stat()` for datasheet hero-number tiles.
-7. Check yourself: where do the eyes land first? It must be the accented element. Would the figure survive
-   being copied out of its document (title + dek + source intact)?
-8. `house_style.save(fig, stem)` — SVG + PDF + 2× PNG. Never `bbox_inches="tight"` on a `page()` figure — the
-   margins are deliberate and tight-cropping shaves them asymmetrically.
+1. **Brief the reader/task/context.** State the decision, medium, dimensions and cost of error.
+2. **Inspect evidence before writing a finding.** Record provenance, observational unit, units,
+   denominator, n, missingness, exclusions and transformations. Identify simulated data. A question
+   or descriptive title is appropriate until a finding is supported.
+3. **Choose the chart and an alternative.** State "`<chart>` because `<shape>` + `<task>`."
+   Prefer a table for lookup; check baselines, aggregation and what the encoding hides.
+4. **Choose register and effort.** `theme("glance"|"read"|"study")` sets typography/density,
+   not an exemption from uncertainty. A0 diagnostic, A1 composed, A2 bespoke; justify A2 with the
+   guide's four checks. An explicitly provisional A0 can be shared as such.
+5. **Compose evidence and qualification.** Use `page(kicker=, title=, dek=, source=, note=)`
+   when a self-contained header helps. Use the OO API. Supported claim or question in the title;
+   units, population, time, method and material caveat must be discoverable. Accent only a justified
+   focal comparison; co-equal groups deserve equal treatment.
+6. **Add reading aids as needed.** `finish()`, `units()`, `label_end()`, `mark()`, `spec_band()`,
+   `stat()` and `panel_title()` are tools, not quotas. A legend can outperform colliding direct labels.
+   A spec band is not an uncertainty interval. Do not add an unsupported interpretive callout.
+7. **Validate the real output.** Recompute summaries, check scales and limits, inspect at delivery
+   size, check redundant identity/contrast and provide alt text plus a caption/data route. Report
+   which checks were automated and which were visual; do not claim accessibility certification.
+8. **Export and extract a reusable conditional rule.** `house_style.save(fig, stem)` exports
+   SVG/PDF/PNG. Preserve `page()` margins (do not tight-crop that layout). Re-render when reuse fails
+   destination-size checks. Record the task, choice, reason, exception and observable acceptance test.
 
-### Hard rules
-- No rotated y-axis labels — units in the dek or `house_style.ylabel_above()`. No centred titles; one left
-  edge for the whole header stack (kicker/title/dek).
-- No legend boxes on line charts — `label_end()` direct labels or dek colour-keying.
-- No naked "decluttered" figures — every shared figure carries its interpretive layer (`mark()`, at least
-  one).
-- Bars start at zero, never broken. Bar-of-means never hides raw points at small n — show the points beside
-  the summary.
-- No pie beyond ~5 slices. No dual-y-axis unless units truly differ — and then align the zeros and colour-key
-  label + ticks + spine of *both* axes to their series; otherwise split into stacked shared-x panels (usually
-  better even then).
-- No rainbow/jet. Palette is computed, not eyeballed: categorical → `house_style.SERIES` (fixed order, violet
-  leads, never cycled — a 7th series is a design failure); sequential → `house_style.SEQUENTIAL` or viridis;
-  diverging → `house_style.diverging_norm()` (symmetric, centred) with `house_style.DIVERGING`. Any palette
-  change runs `visualization-curriculum/check_palette.py` (CVD ΔE ≥ 12, contrast ≥ 3:1).
-- Grey-for-context + one accent (`#6400FF`) is the *default* for a single-message chart — not a mandate.
-  Use the validated categorical/sequential palette when several series genuinely need distinguishing (never
-  rainbow); don't force everything to monochrome. Thousands separators + unit-aware tick formatters always.
-- League Spartan is display-only (≥10 pt, never tick labels or numeral columns — proportional figures jitter);
-  Junction carries the working text. Special glyphs (° → Ω) need `family=house_style.BODY_STACK` explicit.
-- Colorbars sized to the axes: `fraction=0.046, pad=0.04`.
-- Size the figure first (it's the master coordinate); compose multi-panel with `house_style.page(mosaic=…)`,
-  sharing one colour encoding across panels. Many series → small multiples (one panel per group, shared axes),
-  never spaghetti. Zoom with an inset (`inset_axes` + `indicate_inset_zoom`).
-- One figure, one register — re-render for a different medium, never reuse.
+### Integrity requirements vs. house defaults
+- Bars encode magnitude by length: start at zero; do not break the scale. Cropped dot/line axes are
+  permitted when clearly labelled and proportionate to the task. State log transforms and references.
+- Show raw points alongside summaries at small n when disclosure is safe. Define uncertainty type,
+  level/method and sampling unit; material uncertainty belongs in **every** register. Never invent it.
+- Show missingness honestly, retain denominator changes and distinguish association from causation.
+- Prefer shared-x panels over dual y axes. Different units and aligned zeros do not fix arbitrary
+  scale comparisons. If a domain convention warrants twins, label both scales, distinguish marks
+  without colour alone, and warn against interpreting crossings or relative slopes.
+- Use categorical/sequential/diverging colour for the appropriate semantics. Do not cycle a palette
+  into ambiguous identities or use rainbow/jet for ordered magnitude. Palette changes run
+  `check_palette.py`; swatch checks alone do not establish chart accessibility.
+- Single accent, left-aligned title, horizontal unit labels, six categorical colours, direct labels,
+  quiet grid and the house fonts are **defaults**, not integrity laws. Keep/revise them based on task,
+  fit and readability. No compulsory `mark()`, no compulsory finding, no automatic ban on legends.
+- League Spartan is the display default, Junction the body default. Special glyphs may need
+  `family=house_style.BODY_STACK`. Check actual glyphs and text contrast in exported output.
+- Set size before composition. Shared scales support magnitude comparison; if using free scales
+  for shape, label that explicitly. Keep colour identities consistent across panels.
 
 ### Libraries / stack
 matplotlib (OO API), numpy, pypalettes (palettes), highlight-text (titles). **Curriculum data is numpy, not
@@ -122,7 +114,7 @@ pandas** (see below); pandas is used only by `data/build_datasets.py` (one-time 
   (a dataset's columns, read from the built `.npz`); helpers `select`, `group`, `pivot`, `rolling_mean`,
   `corr`, `std`, `finite` cover the few table ops (NaN-aware, pandas-parity). Plotting cells do plain numpy —
   `gapminder["lifeExp"][gapminder["year"] == 2007]`, never a DataFrame. Keep new data work in this style.
-- **Every curriculum module ends with a before/after figure on real data** (raw/wrong → house/right) that
+- **Every curriculum module ends with a before/after figure on documented data** (default → task-adapted) that
   distils the module's principle. Preserve this convention when adding modules.
 - **Snippet code style — names that read like the chart, black-*style* readability (not black output).**
   Variables (including intermediates) name *what they hold*, not their type: `median_life_exp`, not `vals`;
@@ -138,9 +130,11 @@ pandas** (see below); pandas is used only by `data/build_datasets.py` (one-time 
 
 ## Environment & commands
 
-The env is uv-managed and git is initialized on `main`. There is no test/lint/CI yet.
+The env is uv-managed. Work on the requested review branch; do not merge or publish without human
+approval. `.github/workflows/publish.yml` builds branch/PR reviews with read-only permissions;
+only a main push or main manual run can deploy. Never trigger that deployment during review.
 
-- **Sync / install deps:** `uv sync` — installs the plotting stack plus the `dev` group (jupyter + ipykernel,
+- **Sync / install deps:** `uv sync --locked` — installs the plotting stack plus the `dev` group (jupyter + ipykernel,
   needed to render Quarto). Add a dep with `uv add <pkg>`.
 - **Run in the env:** `uv run python ...` (e.g. `uv run python -c "import house_style"` from the
   `visualization-curriculum/` dir).
@@ -151,4 +145,21 @@ The env is uv-managed and git is initialized on `main`. There is no test/lint/CI
   engine, so run it through `uv run` to pick up the venv kernel. Code cells `import house_style`, which
   resolves because each cell's working directory is the `.qmd`'s own folder.
 
-When you add tests/lint/CI, record the commands here.
+### Review and validation commands
+
+```bash
+uv sync --locked
+uv run python data/build_datasets.py
+uv run python scripts/check_house_palette.py
+uv run python -m unittest discover -s tests -v
+uv run quarto render visualization-curriculum/better_graphs.qmd
+uv run python scripts/validate_review.py
+```
+
+The validator checks local Markdown paths, embedded HTML images/alt text/internal anchors, and
+self-contained resources; it does not claim a live external-link or screen-reader audit. Workflow
+conditions are covered by tests; use `actionlint` as the separate GitHub Actions syntax check.
+For this review, copy the rendered file to `reviews/gpt-6-astra/index.html` after validation. That
+single explicit HTML location is unignored; do not stage other build outputs, `observations/`,
+`skills/` or unrelated files. Commit only explicit paths, then push the review branch, never main.
+The committed preview is a downloadable local artifact, not a deployed preview site.

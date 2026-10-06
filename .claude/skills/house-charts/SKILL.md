@@ -1,117 +1,93 @@
 ---
 name: house-charts
 description: >-
-  Use whenever creating, reviewing, or revising a matplotlib chart, figure, or data
-  visualization. Applies the "Better Graphs" house style — a figure is a small publication,
-  with an editorial page anatomy (kicker/title/dek/source), three audience registers
-  (glance/read/study), an altitude ladder that says when to go bespoke with raw Artists, and
-  a computed (CVD-validated) palette on warm paper — and forces a deliberate chart-CHOICE
-  decision before any plot is drawn. Trigger on requests like "plot this", "make a chart/
-  graph/figure", "visualize", "improve this plot", or any matplotlib work.
+  Use when creating, reviewing or revising matplotlib charts. Apply Better Graphs'
+  evidence-first decision brief, task-based chart choice, reader registers, uncertainty,
+  accessible encodings and real-output checks. Preserve the reusable house-style API
+  without treating its aesthetic defaults as integrity rules.
 ---
 
-# House charts — a figure is a small publication
+# House charts — evidence before emphasis
 
-Not a printout of arrays: a headline, a standfirst, a body, and a source line, edited for a
-specific reader with a specific attention budget. Decluttering is the precondition, not the
-payoff — a shipped figure also needs an accent series and a plain-language annotation stating
-the conclusion (*focused* beats merely *decluttered*: Ajani, Xiong, Knaflic & Franconeri).
+A chart helps a reader reason about evidence. Inspect the evidence before asserting a finding;
+a question or descriptive title is valid. The house style is a starting point, not a correctness test.
 
-## Before drawing anything — answer three questions, in order
+## Before drawing
 
-1. **What am I saying?** One sentence with a verb, written before any code. If
-   `VISUALIZATION_GUIDE.md` from the Better Graphs repo is available, answer its chart-choice
-   checklist; otherwise apply these defaults, and state the pick: **"`<chart>` because
-   `<data shape>` + `<task>`."**
+1. State reader, task, medium, dimensions and decision stakes.
+2. Inspect provenance, units, observational unit, denominator, n, missingness, exclusions and transforms.
+   Distinguish measured, estimated and synthetic data. State what cannot be inferred.
+3. Say **“`<chart>` because `<shape>` + `<task>`”** and compare an alternative:
 
-   | You want the reader to see…        | Use                          | Not                         |
-   |------------------------------------|------------------------------|-----------------------------|
-   | a ranking across categories        | horizontal bars, sorted      | vertical bars, pie          |
-   | change between two states          | dumbbell / slope             | grouped bars                |
-   | a trend over time                  | line (direct-labelled)       | many-series spaghetti       |
-   | a part-to-whole (≤5 parts)         | stacked bar / bar            | pie with many slices        |
-   | a relationship                     | scatter                      | dual-axis tricks             |
-   | a matrix / seasonality             | heatmap (sequential ramp)    | 3-D, rainbow                |
+   | Task | Starting form | Check / alternative |
+   |---|---|---|
+   | Exact lookup | Table | Does graphical comparison actually help? |
+   | Rank categories | Sorted dots/bars | Natural order may matter; magnitude bars start at zero |
+   | Paired change | Dumbbell/slope | Grouped bars can serve comparison of levels |
+   | Trend | Line | Real time spacing, missing-data gaps, smoothing disclosed |
+   | Distribution | Points, histogram, ECDF | State n/bins; summary alone can hide shape |
+   | Relationship | Scatter | Overplotting, confounding; no causal claim from association |
+   | Composition | Shares/stacked bar | Whole/denominator known; a few labelled pie slices can work |
+   | Matrix | Heatmap | Colour limits/units; table for exact values |
 
-2. **Who is reading?** Pick the **register** and say it — `house_style.theme(register)` is
-   the first plotting line:
-   - `glance` — 3 s, a slide/poster: one message, one accent, direct labels, ≤4 ticks.
-   - `read` — 30 s, a report/README: full anatomy, ≤4 series, ~3 interpretive callouts.
-   - `study` — minutes, an appendix/datasheet: mosaics, uncertainty shown, exact values.
+4. Choose `glance` (seconds), `read` (tens of seconds), or `study` (minutes) for density/size.
+   These are heuristics. **Material uncertainty stays visible in every register.**
+5. Choose effort: A0 provisional diagnostic, A1 composed default, A2 bespoke only with a standard-view
+   comparison, specific task benefit, justified cost and decoding/integrity checks.
 
-3. **How hard should I try?** The **altitude**: A0 themed default (own eyes only) →
-   A1 composed catalog chart (**default for anything shared**) → A2 bespoke Artists. A2
-   requires all four gates: the message survives a standard form; the standard form buries
-   it or the form itself carries meaning; audience × lifetime pays for the craft; it stays
-   honest (position/length for the core quantity, zero-based lengths, printed exact values
-   for inexact encodings, a how-to-read key for novel forms — and never bespoke at glance).
-
-## The workflow
+## Working pattern
 
 ```python
 import house_style
-house_style.theme("read")                        # the register, first plotting line
+house_style.theme("read")
 fig, ax = house_style.page(
-    kicker="Topic · period",                      # tracked caps, above the title
-    title="A finding with a verb",                # League Spartan; never the axis names
-    dek="What/units/method. <Series> names colour-key into this sentence.",
-    dek_highlights=[{"color": house_style.ACCENT, "weight": 700}],   # legend, dissolved
-    source="Source: …",                           # non-negotiable
+    kicker="Topic · period",
+    title="A supported finding — or the question under study",
+    dek="Population, measure, units and method.",
+    source="Source: dataset/version; exclusions and synthetic status if relevant",
+    note="Material limitation or interval definition, if applicable",
 )
-ax.plot(x, y, color=house_style.ACCENT)           # OO API only after this point
-house_style.finish(ax)                            # polish: grid, tick budget, bounded spine
-house_style.units(ax, "y", "db")                  # unit on the top tick only
-house_style.mark(ax, x0, y0, "what it MEANS")     # the interpretive layer — mandatory
-house_style.save(fig, "stem")                     # svg+pdf+png; never bbox_inches='tight'
+ax.plot(x, y, color=house_style.ACCENT, label="Identified series")
+house_style.finish(ax)
+# Add units(), label_end(), a legend or mark() only as the reading task requires.
+house_style.save(fig, "stem")
 ```
 
-`label_end()` replaces line-chart legends; `spec_band()` draws limits; `stat()` makes
-datasheet hero-number tiles; `panel_title()` titles mosaic panels.
+Use the OO API; `page()` can create mosaics; `spec_band()` denotes a threshold, not uncertainty.
+Preserve page margins at export; do not use `bbox_inches="tight"` on that layout. The exported
+SVG uses text paths: provide accessible text separately, not an assumption that SVG is accessible.
 
-## Hard rules
+## Integrity and readability checks
 
-- No rotated y-axis labels — units in the dek or `house_style.ylabel_above()`. No centred
-  titles; one left edge for the whole header stack (kicker/title/dek).
-- No legend boxes on line charts — `label_end()` direct labels or dek colour-keying.
-- No naked "decluttered" figures — every shared figure carries its interpretive layer
-  (`mark()`, at least one).
-- Bars start at zero, never broken. Bar-of-means never hides raw points at small n — show
-  the points beside the summary.
-- No pie beyond ~5 slices. No dual-y-axis unless units truly differ — and then align the
-  zeros and colour-key label + ticks + spine of *both* axes to their series; otherwise split
-  into stacked shared-x panels (usually better even then).
-- No rainbow/jet. Palette is computed, not eyeballed: categorical → `house_style.SERIES`
-  (fixed order, violet leads, never cycled — a 7th series is a design failure); sequential →
-  `house_style.SEQUENTIAL` or viridis; diverging → `house_style.diverging_norm()` (symmetric,
-  centred) with `house_style.DIVERGING`. Context series take `house_style.CONTEXT`/`SMOKE`
-  grey; `GOOD`/`BAD` (emerald/rust) are reserved status colours, never a "series 7". Any
-  palette change runs `check_palette.py` (CVD ΔE ≥ 12, contrast ≥ 3:1).
-- League Spartan is display-only (≥10 pt, never tick labels); Junction carries working text.
-  For special glyphs (° → Ω), pass `family=house_style.BODY_STACK` explicitly.
-- One figure, one register — re-render for a different medium, never reuse.
-- Export via `house_style.save()`; never `bbox_inches="tight"` on a `page()` figure — the
-  margins are deliberate and tight-cropping shaves them asymmetrically.
+- Recompute summaries and validate units/denominators, filters, precision and time coverage.
+- Magnitude bars start at zero; cropped dot/line scales can be valid when explicit. State log transforms.
+- Define interval type, level, method and sampling unit; distinguish spread from estimator uncertainty.
+  Show observations at small n when safe. Do not invent uncertainty or use overlap as a universal test.
+- Prefer stacked shared-x panels over dual axes. Different units/zero alignment do not fix arbitrary
+  scaling. If twins are justified, label both and warn that crossings/slopes are not comparable.
+- Use categorical/sequential/diverging colour according to meaning. `SERIES`, `SEQUENTIAL`,
+  `DIVERGING` and `diverging_norm()` are available; don't cycle into ambiguous identities.
+  Run `check_palette.py` on changes; it is a swatch simulation, not accessibility certification.
+- Keep essential text/marks legible. Use labels, patterns, markers or facets so identity survives loss of hue.
+  Status colours need words/symbols. Provide alt text and a nearby caption/data route for HTML.
+- One accent, quiet grids, direct labels, left headers, house fonts and horizontal unit labels are
+  **defaults**. Co-equal series, legends, neutral titles and retained grids can better serve the task.
+  Neither an accent nor `mark()` is mandatory. Do not cut caveats to fit an attention budget.
+- Inspect exported output at intended size: no clipped labels, collisions, unreadable caveats or
+  misleading emphasis. Verify local links. Report automation separately from human visual checks.
 
-## The reusable artifacts (read these; they are the source of truth)
+## Source of truth and reuse
 
-If working inside the Better Graphs repo, these are local; otherwise fetch the raw versions:
+Inside the repository read `CLAUDE.md`, `VISUALIZATION_GUIDE.md`,
+`visualization-curriculum/house_style.py` and `visualization-curriculum/check_palette.py`.
+Outside it, use the matching files at:
 
-- **`CLAUDE.md`** — the full operating manual (workflow + hard rules).
-- **`VISUALIZATION_GUIDE.md`** — the design framework: chart-choice (10 rules, a pre-flight
-  checklist, a *(data shape × task) → chart* lookup, a catalog), the reader register, the
-  altitude ladder, the page anatomy, and the computed colour system.
-- **`visualization-curriculum/house_style.py`** — the one-import lever: `theme()`, `page()`,
-  `finish()`, `units()`, `label_end()`, `mark()`, `spec_band()`, `stat()`, `panel_title()`,
-  `diverging_norm()`, `save()`, and the `SERIES`/`ACCENT` palette plus `SEQUENTIAL`/
-  `DIVERGING` house colormaps.
-- **`visualization-curriculum/check_palette.py`** — the palette validator (CVD + contrast).
+- https://raw.githubusercontent.com/temataro/better-graphs/main/CLAUDE.md
+- https://raw.githubusercontent.com/temataro/better-graphs/main/VISUALIZATION_GUIDE.md
+- https://raw.githubusercontent.com/temataro/better-graphs/main/visualization-curriculum/house_style.py
 
-Raw URLs (replace if the repo moves):
-`https://raw.githubusercontent.com/temataro/better-work-graphs/main/CLAUDE.md`,
-`https://raw.githubusercontent.com/temataro/better-work-graphs/main/VISUALIZATION_GUIDE.md`,
-`https://raw.githubusercontent.com/temataro/better-work-graphs/main/visualization-curriculum/house_style.py`.
-
-When `house_style.py` is not importable, replicate its decisions by hand: warm paper
-`#FAF7F2`, warm ink `#201D1A`, muted text `#6B655D`, hairline grid `#E3DDD1`, violet accent
-`#6400FF`, League-Spartan-ish display + humanist body, y labels sitting on their gridlines,
-bottom rule ending at the data, a kicker/title/dek/source stack sharing one left edge.
+Those main URLs describe the released version, not an unmerged review branch. Use local branch files
+when reviewing changes. If the helper is unavailable, reproduce evidence, scale and accessibility
+checks first; matching warm paper/violet/fonts is optional. Extract conditional rules:
+“For this task use X because Y; switch to Z when W; test by observing Q.”
+Never merge, publish or deploy a review without explicit human approval.

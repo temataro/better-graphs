@@ -1,21 +1,18 @@
 # Better Graphs
 
-**Teach an AI agent to make matplotlib charts that don't look like matplotlib —
-Tufte-grade figures, by writing taste down as rules.**
+**A course and reusable matplotlib toolkit for charts that help readers reason about evidence.**
 
-With AI, I can offload my unhealthy obsession with making graphs look nice to
-agents! But they need to do a good job of it — not a question of competence
-but of taste! Edward Tufte's [The Visual Display of Quantitative Information](https://www.edwardtufte.com/book/the-visual-display-of-quantitative-information/)
-is our North star and the benchmark we're going to set for ourselves as
-professional graph makers & communicators of scientific data!
+Start with the reader's task, inspect the data, choose an honest encoding, and then compose a readable
+figure. The house palette, typography and page anatomy are justified defaults, not universal laws.
+Uncertainty, provenance and accessible reading matter more than making a chart look unlike Python.
 
 📖 **Read it online (the live "blog"):** <https://temataro.github.io/better-graphs/>
 
 ---
 
-Same data, same library — the only difference is **taste**, written down so an agent
-applies it every time. Here's a real RF device report drawn the default matplotlib
-way, then with this repo's house style:
+Same synthetic teaching data, same library — different layout and emphasis. Here is an RF-style
+report before and after composition. These are **not real device measurements** or proof that one
+aesthetic improves every task:
 
 <table>
 <tr><td align="center"><b>Before</b> — plain matplotlib defaults</td></tr>
@@ -60,17 +57,16 @@ curriculum ends with one of these.
 
 A short **course** plus a **reusable style kit**. The rules live in plain files an AI
 agent reads *before* it draws — so you (or your agent) get deliberate, presentation-ready
-figures without re-explaining good taste each time. Three files do the real work:
+figures with explicit reasoning and repeatable checks. Three files do the real work:
 
-- **[`CLAUDE.md`](CLAUDE.md)** — the operating manual: the workflow (choose the chart → choose
-  the register → build the page → polish → export) and the hard rules.
+- **[`CLAUDE.md`](CLAUDE.md)** — the operating manual: the workflow (brief → inspect evidence → choose encoding → compose → validate → export).
 - **[`VISUALIZATION_GUIDE.md`](VISUALIZATION_GUIDE.md)** — *which* chart to use, *who* it's for
   (the `glance`/`read`/`study` register), and *how hard to try* (the altitude ladder): a
   checklist, a *(data shape × task) → chart* lookup, a catalog, and the page anatomy + colour
   system.
 - **[`visualization-curriculum/house_style.py`](visualization-curriculum/house_style.py)** —
-  the one-import lever: `theme()`, `page()`, `finish()`, `save()`, and the CVD-validated,
-  accent-led palette. One line turns a default chart into the "after" above.
+  the one-import lever: `theme()`, `page()`, `finish()`, `save()`, and the CVD-simulated
+  palette. Helpers preserve consistent styling; they cannot validate data or claims.
 
 The course (`visualization-curriculum/better_graphs.qmd`, modules M0–M7) is the worked-example
 companion — each module states one principle, builds one thing, and folds one rule back into
@@ -93,35 +89,50 @@ agent consults the design system first — no clone needed:
 ```markdown
 ## Before making any chart or data visualization
 Consult the Better Graphs design system first and follow its workflow + hard rules:
-- Operating manual: https://raw.githubusercontent.com/temataro/better-work-graphs/main/CLAUDE.md
-- Chart-choice framework: https://raw.githubusercontent.com/temataro/better-work-graphs/main/VISUALIZATION_GUIDE.md
-- The lever module: https://raw.githubusercontent.com/temataro/better-work-graphs/main/visualization-curriculum/house_style.py
-State the chart type and WHY in one line before plotting, and pick a register (glance/read/
-study). Use the matplotlib OO API, a page anatomy with a takeaway title and a source line (not
-an axis-name title), an accent-led palette over grey (never jet), and unit-aware ticks. Ask for
-confirmation on dual-axis or pie.
+- Operating manual: https://raw.githubusercontent.com/temataro/better-graphs/main/CLAUDE.md
+- Chart-choice framework: https://raw.githubusercontent.com/temataro/better-graphs/main/VISUALIZATION_GUIDE.md
+- The lever module: https://raw.githubusercontent.com/temataro/better-graphs/main/visualization-curriculum/house_style.py
+State reader/task/context, inspect evidence, then choose chart and register (glance/read/study).
+A title may be a finding or a question. Keep material uncertainty in every register, identify synthetic
+data, and provide redundant series identities and text alternatives. Use the OO API and verify actual
+exports. House colours, direct labels and callouts are defaults, not mandatory persuasion.
 ```
 
 **3. Project pointer.** One line in a repo's `CLAUDE.md`:
 
 > For any figure, follow the Better Graphs house style
-> (https://github.com/temataro/better-work-graphs) — chart choice first, then its workflow.
+> (https://github.com/temataro/better-graphs) — chart choice first, then its workflow.
 
 ## Run it locally
 
 The plotting stack is uv-managed; the datasets are gitignored but regenerate on demand:
 
 ```bash
-uv sync                                              # plotting + jupyter stack
+uv sync --locked                                     # plotting + jupyter stack
 uv run python data/build_datasets.py                 # download + synthesize data/*.npz
 uv run quarto preview visualization-curriculum/better_graphs.qmd   # live-reload course
 uv run python assets/readme_figures.py               # regenerate the before/afters above
 ```
 
-Pushing to `main` auto-publishes the site via
-[`.github/workflows/publish.yml`](.github/workflows/publish.yml) — it rebuilds the data in CI,
-renders to a self-contained `index.html`, and deploys to Pages (enable Settings → Pages →
-"GitHub Actions" once).
+## Review, tests and publication boundary
+
+```bash
+uv run python scripts/check_house_palette.py
+uv run python -m unittest discover -s tests -v
+uv run quarto render visualization-curriculum/better_graphs.qmd
+uv run python scripts/validate_review.py
+# If installed: actionlint .github/workflows/publish.yml
+```
+
+[The workflow](.github/workflows/publish.yml) builds and validates branch pushes and pull requests,
+then uploads a downloadable `curriculum-review` artifact. **Reviews do not deploy.** Only a push to
+`main` or a manual run selected on `main` can upload the Pages artifact and deploy with job-scoped
+write permissions. Review builds have only `contents: read`. Human review and any later merge remain
+the user's responsibility; this branch does not change main or trigger publishing.
+
+For this proposal, open [reviews/gpt-6-astra/index.html](reviews/gpt-6-astra/index.html) locally after
+downloading/cloning (GitHub's source view is not an HTML host). It is the actual self-contained render,
+not the live site. [The review record](reviews/gpt-6-astra/REVIEW.md) lists changes, checks and limitations.
 
 ## Why I'm building this
 
@@ -151,6 +162,7 @@ look like Python anymore.
 
 ## AI attribution
 
-Built with **Claude Opus 4.8** as a pair author under human direction — drafting the curriculum,
-writing and refactoring `house_style.py` and the snippets, and rendering/verifying the figures.
-Editorial direction, data choices, and final review are the author's.
+The repository's original attribution named **Claude Opus 4.8** as a pair author under human direction.
+That historical claim is preserved, not independently verified by this revision. This review's
+independent interpretation uses the configured model label **gpt-6-astra**. Editorial approval remains
+with the human author; no approval, merge or publication is implied by the branch or generated HTML.

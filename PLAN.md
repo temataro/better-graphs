@@ -1,5 +1,9 @@
  # Better Graphs — Build Plan
 
+> **Historical roadmap.** The current decision authority is [VISUALIZATION_GUIDE.md](VISUALIZATION_GUIDE.md).
+> Its evidence, uncertainty and accessibility checks supersede aesthetic absolutes here.
+> The RF datasets are synthetic; use `save()` without tight cropping for `page()` layouts.
+
 A principle-first path from "competent, but my defaults look like matplotlib" to "charts that read as
 deliberate." The real output isn't the charts — it's a **reusable instruction set for coding agents**
 (`VISUALIZATION_GUIDE.md`, `house_style.py`, `CLAUDE.md`) so future agents produce consistent, defensible
