@@ -166,3 +166,11 @@ The repository's original attribution named **Claude Opus 4.8** as a pair author
 That historical claim is preserved, not independently verified by this revision. This review's
 independent interpretation uses the configured model label **gpt-6-astra**. Editorial approval remains
 with the human author; no approval, merge or publication is implied by the branch or generated HTML.
+
+## New workshop: tables inside figures (M8)
+
+The curriculum now includes six new executed table–figure compositions, not just revised prose:
+Student's sleep data as a decision card, analytical summary and paired audit view; Berkeley admissions
+with explicit denominators; and a synthetic three-trial forest-table with a direct between-trial contrast.
+The reusable helper is `visualization-curriculum/evidence_tables.py`. Open the rendered curriculum at
+`#m8-evidence-ledger`. The chapter includes data sources, assumptions and real HTML tables alongside images.

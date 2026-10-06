@@ -106,3 +106,28 @@ this review, and `main` was not modified.
 - **Scope.** The editorial interpretation was reviewed for internal consistency and factual
   accuracy, not rewritten. Chart builders (`bar()`, `line()`, `slope()`, `dumbbell()`, `dist()`,
   `heatmap()`) remain unimplemented, as `PLAN.md` states.
+
+
+## M8 extension — substantive new workshop (2026-10-06)
+
+Implemented in the original `~/code/github.com/temataro/better-graphs` checkout, not only a workspace preview.
+The source `visualization-curriculum/better_graphs.qmd` now contains **M8 — Tables inside figures:
+the evidence ledger**: six new rendered compositions and three accessible-table cells.
+
+- A deliberate before example and three audience-specific views of the historical paired sleep data.
+- A Berkeley admissions figure with shared-row rates and admitted/N columns; no causal fairness claim.
+- A synthetic three-trial comparison with an explicit A-minus-B contrast, not an unjustified pooled effect.
+- Reusable `evidence_tables.py`: source arrays, interval calculations, shared-row layouts and exports.
+- Four new tests for numeric transcriptions, pairing, seeded bootstrap reproducibility, text bounds,
+  missing glyphs and row alignment; existing eight tests retained.
+
+Validation: **12 tests passed; all 42 Quarto cells executed; 34 embedded figures with alt text,
+2699 HTML anchors and 24 local document links passed structural validation.** Quarto reported
+`Output created: index.html`; the shell wrapper then timed out. The finished output was independently
+checked, copied to the review render and validated. Generated trailing whitespace was normalized.
+Two example PNGs were also inspected through the image reader for legibility. This is not a full
+browser or screen-reader audit. R source numeric arrays and documentation, Matplotlib documentation
+and Cochrane chapter 10 were checked online; primary-source links are embedded in M8.
+
+The bootstrap example is deliberately synthetic and centered to fixed illustrative effects. Nominal
+intervals do not establish multiplicity control or a coverage guarantee. No publication or merge occurs.

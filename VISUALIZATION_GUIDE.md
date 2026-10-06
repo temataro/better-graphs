@@ -242,3 +242,21 @@ Useful source routes: [graphical perception](https://doi.org/10.1080/01621459.19
 [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
 These support parts of the framework; the register budgets, palette and page anatomy are local design
 choices to validate in context, not scientific laws. [PLAN.md](PLAN.md) retains the original course roadmap.
+
+## M8 — Integrated evidence tables
+
+When readers need both comparative shape and exact lookup, reserve three shared-row lanes inside
+one figure: identity, marks, and numerical account. A table inside a figure need not overlap its data.
+Use the new M8 workshop in `visualization-curriculum/better_graphs.qmd` and `evidence_tables.py`:
+
+- **Glance:** one contrast, denominator and interval; keep material uncertainty.
+- **Read:** context rows plus a separately identified contrast, each with its own interval.
+- **Study:** raw pairs or trial context alongside estimates; preserve independent-unit counts.
+- Align numeric columns and precision; give units in headers; distinguish zero, missing and not-applicable.
+- Generate marks, numeric cells and an accessible text table from the same records.
+- Compare effects with a contrast, not with the presence/absence of significance in separate studies.
+- Keep aggregates, subgroups, raw observations and contrasts in visibly different blocks.
+- Never pool incompatible endpoints or treat shared-control contrasts as independent merely to complete a table.
+
+The M8 historical examples cite R's sleep and Berkeley datasets; the multi-trial example is synthetic.
+This is a composition pattern, not a statistical model or a claim of a new chart invention.

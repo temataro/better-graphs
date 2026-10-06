@@ -33,7 +33,8 @@ work, not predetermine the conclusion. We start with a question, inspect data an
 choose an encoding, and only then earn the headline. A neutral title, a table, or “the evidence
 is inconclusive” can be more useful than a striking takeaway.
 
-This revision retains the M0–M7 code and before/after teaching examples while changing the
+This revision retains the M0–M7 code and adds M8: six new table–figure compositions,
+two historical datasets, and a synthetic multi-trial comparison. It changes the
 standard by which to judge them: **what can the reader accurately infer, and what might they
 miss?** The “after” is a task-adapted proposal, not proof that the house aesthetic always wins.
 
@@ -1486,10 +1487,282 @@ bars as a substitute for estimating the paired difference.
 **Reusable rule:** when uncertainty can reverse the decision, spend the attention budget on it before
 spending that budget on decoration. Simplify the question or split the view rather than hide the limit.
 
+# M8 — Tables inside figures: the evidence ledger {#m8-evidence-ledger}
+
+**Build:** one table–figure composition that can become a decision card, an analytical comparison,
+or an audit view without changing its underlying numbers. Then stress-test the design on paired
+measurements, an aggregation trap, and three experiments.
+
+This chapter proposes an **evidence ledger**: a figure in which each row binds an identity, a visual
+comparison and an exact numerical account. This is our name for a reusable composition, not a claim
+that forest plots or integrated tables are new inventions. The novel lesson is the *contract*: the
+picture, the table and the accessible alternative must come from the same records, share the same
+ordering, and answer the same question.
+
+A graph is good at “which, how much, and how variable?” A table is good at “exactly what number,
+for whom, out of how many?” Put them together only when both questions matter. A table **inside the
+figure** need not sit **over the data**. Reserve a lane in the canvas, not an opaque box over points.
+
+## An anatomy that earns its space
+
+Think in four layers:
+
+1. **Identity:** participant, trial or subgroup, left-aligned in a stable row order.
+2. **Shape:** positions, paired segments or interval marks on a common quantitative scale.
+3. **Account:** exact estimates, interval endpoints and denominators in aligned numeric columns.
+4. **Terms:** units, the comparison direction, interval method, source and inferential limits.
+
+The first three share row coordinates. The fourth belongs to a caption/source band, not a microscopic
+footnote inside the plot. The column headers carry units once. Align numbers right, use consistent
+precision within a column, and reserve a dash for “not applicable,” never for zero or missing data.
+Avoid vertical rules; a header rule and a line between conceptual blocks are usually enough. If long
+labels force smaller type, widen the identity lane, split the figure, or move low-priority columns out.
+
+These are design proposals to test at delivery size, not universal laws. A dense regulatory table can
+need stronger rules; a single annotated value may not need a table at all.
+
+| Placement | Use when | Avoid when |
+|---|---|---|
+| Shared-row sidecar | The reader compares an estimate and its exact value repeatedly | Long descriptions swamp the plot lane |
+| Footer strip inside the figure | Only one or two summary rows support a large plot | Readers must trace ten rows across a gap |
+| Small inset table | A genuinely empty region survives changes to limits and data | It masks points, uncertainty, or an important tail |
+| Separate accessible table | Exact lookup, copying, mobile reading or assistive technology is primary | Never omit this merely because numbers also appear in the image |
+
+### Why not just call `ax.table()`?
+
+That is a reasonable starting point for a small rectangular table. Turn off automatic font shrinking,
+set cell widths deliberately, and remove unnecessary edges. Matplotlib's documentation notes that
+line breaks are not automatically accommodated by its table implementation. For the irregular rows
+below, separate axes and text artists give us direct control over alignment and spacing
+([Matplotlib table API](https://matplotlib.org/stable/api/table_api.html)).
+
+```python
+# The actual helper in evidence_tables.py uses this coordinate contract:
+fig = plt.figure(figsize=(12, 6))
+grid = fig.add_gridspec(1, 3, width_ratios=[2.2, 4.2, 3.6])
+labels = fig.add_subplot(grid[0, 0])
+plot = fig.add_subplot(grid[0, 1], sharey=labels)
+numbers = fig.add_subplot(grid[0, 2], sharey=labels)
+for ax in (labels, plot, numbers):
+    ax.set_ylim(n_rows - .4, -1.6)  # rows 0..n-1; header at y=-1
+numbers.text(.98, row, exact_value, ha="right",
+             transform=numbers.get_yaxis_transform())
+# x is a fraction of the table lane; y is the SAME row coordinate as the marks.
+```
+
+The short scaffold is explanatory; the executable implementation is in `evidence_tables.py`.
+It separates calculations from composition so labels cannot silently drift away from plotted values.
+
+## Case 1 — Student's sleep data: one dataset, three audiences
+
+The historical `sleep` dataset in R records two measurements on each of ten people, not two
+independent groups. Values are extra sleep hours relative to control. The paired structure is
+explicit in the [R dataset documentation](https://www.stat.ethz.ch/R-manual/R-devel/library/datasets/html/sleep.html);
+our numeric transcription follows the [R source](https://raw.githubusercontent.com/wch/r-source/trunk/src/library/datasets/data/sleep.R).
+This is a statistical teaching example, not current evidence for choosing a medicine.
+
+### Before — a table that repeats the wrong answer
+
+```{python}
+#| label: fig-m8-sleep-before
+#| fig-cap: "The grid adds exact means, but the composition still fails to show the paired difference or its uncertainty."
+#| fig-alt: "Deliberate before example: two bars show mean extra sleep of 0.75 and 2.33 hours, with a boxed table repeating those means and n=10. The same people occur in both columns."
+import evidence_tables as et
+et.sleep_before()
+plt.show()
+```
+
+Removing gridlines would make this quieter, not more informative. The important repair is to change
+what the table carries: the **comparison and its uncertainty**, not just numbers already encoded by bars.
+
+### Glance — the decision card
+
+```{python}
+#| label: fig-m8-sleep-glance
+#| fig-cap: "A one-row table inside a figure: the interval provides shape; the exact estimate and paired sample size provide an account."
+#| fig-alt: "For the same ten people, drug 2 minus drug 1 averages 1.58 extra hours of sleep, with a 95 percent paired t interval from approximately 0.70 to 2.46 hours. The historical sample is small."
+et.sleep_glance()
+plt.show()
+```
+
+Our design choice for a decision-maker: one contrast, one interval, one denominator. No p-value column,
+no repeated arm summaries, and no deletion of uncertainty to make the card look decisive. If the audience
+has a meaningful threshold, place it on the scale and explain its origin; do not invent one for emphasis.
+
+### Read — the comparison needs a row of its own
+
+```{python}
+#| label: fig-m8-sleep-read
+#| fig-cap: "Condition summaries and the paired contrast are distinct quantities. The accent belongs to the comparison, not to a favored treatment."
+#| fig-alt: "A shared-row table and interval plot show drug 1, drug 2, and their paired difference. The highlighted difference is 1.58 hours with its own 95 percent interval, rather than an inference from overlap of two condition intervals."
+et.sleep_read()
+plt.show()
+```
+
+For an analyst reading a report, keep the arm context but give the estimand—what we are actually
+estimating—its own row. The first two intervals concern condition means; the last concerns within-person
+differences. Do not substitute the former for the latter. Here the paired interval is computed as
+$\bar d \pm t_{9,0.975}s_d/\sqrt{10}$, with a fixed critical value of 2.262157. It assumes independent
+people and approximately normal differences; pairing alone does not establish causal identification.
+
+### Study — the audit view
+
+```{python}
+#| label: fig-m8-sleep-study
+#| fig-cap: "The table is now part of the graphic: a reader can inspect each pair and retrieve its exact values without matching a detached spreadsheet."
+#| fig-alt: "Ten participant rows show linked drug 1 circles and drug 2 squares beside exact values and differences. Nine differences are positive and one is zero; the largest increase is 4.6 hours. Original participant order is preserved."
+et.sleep_study()
+plt.show()
+```
+
+A reviewer gets identities and raw pairs, not a shrunken version of the decision card. Keep the original
+row order unless a different ordering serves an explicit question. Explain that the connecting lines
+encode pairing, not a continuous time trajectory. A tied pair still needs both values in the table.
+
+::: {.callout-note}
+## Audience changes the lookup burden, not the truth
+
+| Register | Reader's task | Inside-figure table | What must remain |
+|---|---|---|---|
+| Glance | Understand the main comparison | Pairs, effect, interval | Direction, units, uncertainty, small-sample caveat |
+| Read | Relate conditions to the comparison | Condition means plus a contrast row | The distinction between summaries and estimand |
+| Study | Audit records and assumptions | Raw paired values and differences | IDs/order, pairing, source and method |
+
+Do not squeeze the study figure into a phone-width column. Offer the simpler view plus the following
+real text table, or a sufficiently large downloadable figure. Typography is a delivery constraint.
+:::
+
+### Accessible values — generated from the same arrays
+
+```{python}
+#| label: m8-sleep-accessible-table
+#| output: asis
+et.markdown_table(["Person", "Drug 1 extra sleep (h)", "Drug 2 extra sleep (h)", "Paired difference (h)"],
+    [(i+1, f"{a:.1f}", f"{b:.1f}", f"{b-a:.1f}")
+     for i, (a,b) in enumerate(zip(et.SLEEP_1, et.SLEEP_2))])
+et.markdown_table(["Quantity", "Mean (h)", "95% t interval (h)", "People"],
+    [(label, f"{m:.2f}", f"{lo:.2f} to {hi:.2f}", 10)
+     for label, (m,lo,hi) in zip(["Drug 1", "Drug 2", "Drug 2 minus drug 1"],
+       [et.mean_ci10(v) for v in (et.SLEEP_1, et.SLEEP_2, et.SLEEP_2-et.SLEEP_1)])])
+```
+
+## Case 2 — Berkeley: put the denominator beside the percentage
+
+The Berkeley admissions example concerns the six largest departments in 1973, not the entire university.
+The dataset contains 4,526 applications and is associated with the Bickel, Hammel and O'Connell paper.
+Our counts follow [R's documentation](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/UCBAdmissions.html)
+and [numeric source](https://raw.githubusercontent.com/wch/r-source/trunk/src/library/datasets/data/UCBAdmissions.R).
+We preserve the source's male/female categories; those are historical labels, not a complete framework
+for gender. Unlike the previous paired example, these are observational admissions counts.
+
+```{python}
+#| label: fig-m8-berkeley
+#| fig-cap: "The integrated table makes mixture weights visible: a rate is not an account of how many applications it represents."
+#| fig-alt: "Admission rates for the six departments combined are about 44.5 percent for male and 30.4 percent for female applicants. Department-specific comparisons differ. Alongside every rate pair are admitted counts and application denominators; the combined row is separated from departments A through F."
+et.berkeley_figure()
+plt.show()
+```
+
+**The design move:** do not repair an aggregation trap with a paragraph alone. Give department and
+aggregate results different blocks, place admitted/N beside the marks, and leave the rate axis common.
+The all-six row summarizes a mixture of departments. It is not a covariate-adjusted estimate, and these
+counts cannot by themselves decide whether a system is fair. We display descriptive rates without
+inventing sampling intervals for a model we have not specified.
+
+```{python}
+#| label: m8-berkeley-accessible-table
+#| output: asis
+counts, male_n, female_n, male_rate, female_rate = et.berkeley_records()
+et.markdown_table(["Department", "Male admitted/N", "Male rate (%)", "Female admitted/N", "Female rate (%)"],
+    [(name, f"{c[0]}/{mn}", f"{mr:.1f}", f"{c[2]}/{fn}", f"{fr:.1f}")
+     for name,c,mn,fn,mr,fr in zip(["All six","A","B","C","D","E","F"],
+         counts,male_n,female_n,male_rate,female_rate)])
+```
+
+**Transfer to experiments:** keep the denominator and the unit of analysis attached to every result.
+A trial with 80 people measured ten times is not automatically a trial with 800 independent observations.
+Our proposed table template makes this a visible design decision, not a detail hidden in a methods file.
+
+## Case 3 — Three trials: show the effect of the comparison
+
+The following experiments are **synthetic**, not attributed to a published study. All use a task-completion
+time endpoint; within each illustrative trial, the arms and participants are independent. We deliberately
+center generated values to give effects of 6, 3 and 1 seconds, then bootstrap observations separately
+within each arm. This is a controlled design lesson, not evidence about interface performance or a
+simulation study establishing coverage.
+
+```{python}
+#| label: fig-m8-trials
+#| fig-cap: "A forest-table hybrid carries setting, arm size, effect and interval. The fourth row compares two effects directly; it is not a pooled estimate."
+#| fig-alt: "Three synthetic independent-arm trials have time-saving estimates of 6, 3 and 1 seconds and 40, 120 and 60 people per arm. Each has a bootstrap interval. A separated fourth row shows the A-minus-B effect contrast of 3 seconds with an interval that includes zero."
+et.trials_figure()
+plt.show()
+```
+
+A's interval and B's interval answer different within-trial questions. To compare their effects,
+calculate **A minus B** and its uncertainty. Under the independence assumption here, subtracting
+independent bootstrap draws gives the illustrated contrast distribution. The source code records the
+seed, 12,000 draws and percentile interval method. These nominal intervals have no multiplicity correction.
+
+Do not infer a difference merely because one interval excludes zero and another does not. Cochrane's
+[guidance on subgroup comparisons](https://www.cochrane.org/authors/handbooks-and-manuals/handbook/current/chapter-10)
+explains why the comparison itself needs analysis, and why across-study subgroup findings can be misleading.
+Here “novice” and “practiced” describe separate trials with different settings; the contrast does **not**
+identify a causal effect of expertise. The figure deliberately contains **no pooled diamond**.
+
+```{python}
+#| label: m8-trials-accessible-table
+#| output: asis
+trial_rows, contrast_interval = et.synthetic_trials()
+et.markdown_table(["Trial", "Setting", "People per arm", "Time saved (s)", "Nominal 95% bootstrap interval (s)"],
+    [(r["trial"], r["setting"], r["n"], f'{r["effect"]:.1f}', f'{r["lo"]:.1f} to {r["hi"]:.1f}')
+     for r in trial_rows] + [("A minus B", "Exploratory across-trial contrast", "Not applicable", "3.0",
+        f"{contrast_interval[0]:.1f} to {contrast_interval[1]:.1f}")])
+```
+
+### The experimental-comparison design brief
+
+Before drawing a multi-trial table, complete this brief. If a row changes the estimand, give it a new
+block; if an axis changes units, give it a new panel. A shared visual language must not imply a shared
+statistical model.
+
+| Question | Consequence for the figure |
+|---|---|
+| Same people, independent people, or clusters? | Preserve pairing; report independent-unit counts; use an analysis that respects the design |
+| Same endpoint and follow-up? | Separate incompatible endpoints/time windows; don't pool just because numbers fit |
+| Difference, ratio, or change from baseline? | Name the estimand and favorable direction; use the appropriate null reference |
+| What uncertainty is shown? | State CI/SD/SE/quantiles and the estimation method; don't mix them under one header |
+| Several arms share one control? | Do not treat correlated contrasts as independent in a synthesis |
+| Several outcomes or post-hoc subgroups? | Mark exploratory analyses and describe multiplicity handling rather than adding stars |
+| Adjusted and unadjusted estimates? | Separate rows, label models/covariates, and keep sample/analysis populations explicit |
+| Different settings? | Show setting beside the effect; do not label across-trial differences as causal moderators |
+
+These are prompts to obtain the appropriate analysis, not a generic recipe for fitting one. The examples
+implement only the paired t calculation and independent-arm bootstrap explicitly described above.
+
+## A practical acceptance test
+
+An evidence ledger is finished when a reviewer can:
+
+- trace any mark horizontally to the correct identity, estimate and denominator;
+- reproduce displayed values from the same arrays used by the plot, before rounding;
+- tell a missing value, a tie, zero and not-applicable apart;
+- name the estimand, units, interval method and direction without opening the code;
+- distinguish an aggregate, subgroup, participant and contrast row;
+- read the smallest text at the intended output size, without relying on color alone;
+- retrieve exact values from an actual HTML table, not OCR from a PNG.
+
+**Exercise:** add a fourth synthetic trial with a different follow-up. Resist squeezing it into the
+same effect column until you have decided whether it estimates the same quantity. Then design an
+executive card and a methods-appendix view from the same records. Explain every omitted column.
+
+**Rule extracted:** a table inside a figure earns its area by supplying *auditability that the marks
+cannot*, not by repeating every plotted coordinate. Change the lookup burden for the audience;
+never change the evidence to suit the layout.
+
 # The whole path, distilled {.unnumbered}
 
-Eight modules, each ending with a before/after on documented teaching data and a rule pushed back into the three durable
-artifacts:
+Nine modules: the original M0–M7 path plus M8, a new integrated-table and experimental-comparison workshop. Each leaves reusable guidance:
 
 | Module | Principle | The lever it left behind |
 |---|---|---|
@@ -1501,6 +1774,7 @@ artifacts:
 | **M5** | spend ink only on information | `finish(ax, grid=...)` |
 | **M6** | one theme, three registers | `theme(register)` |
 | **M7** | one dataset, two figures, exported right | `save(fig, stem)` |
+| **M8** | tables and marks share an evidence contract | `evidence_tables.py`: aligned rows, audience views, paired and multi-trial comparisons |
 
 The figures were always the byproduct. The deliverable is `CLAUDE.md` + `VISUALIZATION_GUIDE.md` +
 `house_style.py` — enough for any future agent to make a deliberate, defensible figure with zero

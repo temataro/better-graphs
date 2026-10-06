@@ -163,3 +163,11 @@ For this review, copy the rendered file to `reviews/gpt-6-astra/index.html` afte
 single explicit HTML location is unignored; do not stage other build outputs, `observations/`,
 `skills/` or unrelated files. Commit only explicit paths, then push the review branch, never main.
 The committed preview is a downloadable local artifact, not a deployed preview site.
+
+### Tables integrated into figures (M8)
+
+Use `visualization-curriculum/evidence_tables.py` for a shared-row label/plot/value layout when readers
+need exact lookup alongside shape. Derive all three lanes and the accessible HTML table from the same
+records. Preserve pairing, denominators, contrast definitions and interval methods. Change columns
+for glance/read/study, not the underlying evidence. M8 adds historical paired and admissions cases
+plus an explicitly synthetic multi-trial comparison; do not report those synthetic results as real.

@@ -225,3 +225,10 @@ End state: hand `CLAUDE.md` + `VISUALIZATION_GUIDE.md` + `house_style.py` to
 any future agent for consistent charts with zero re-explanation.
 
 ---
+
+## Implemented extension — M8: tables inside figures
+
+A new workshop beyond the original eight-module path: six executed compositions (before, glance,
+read, study, Berkeley denominator comparison, multi-trial contrast), reusable `evidence_tables.py`,
+accessible companion tables, and numerical/layout regression tests. The table earns space by adding
+an exact account, not by duplicating every plotted coordinate. Existing chart-builder roadmap remains.
